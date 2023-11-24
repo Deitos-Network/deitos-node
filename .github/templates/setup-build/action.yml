@@ -1,0 +1,13 @@
+name: Setup build dependencies
+description: |
+  This action sets up a build environment for this project.
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Setup Ubuntu dependencies
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt install -y clang llvm libudev-dev protobuf-compiler
