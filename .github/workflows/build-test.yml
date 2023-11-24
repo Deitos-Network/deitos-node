@@ -1,0 +1,25 @@
+name: Task - Build & Test
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup build dependencies
+        uses: "./.github/templates/setup-build"
+
+      - name: Show rust toolchain
+        run: rustup show
+
+      - name: Build the project
+        run: |
+          cargo build --workspace
+
+      - name: Run tests
+        run: |
+          cargo test

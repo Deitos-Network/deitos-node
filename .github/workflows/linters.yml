@@ -1,0 +1,20 @@
+name: Task - Linters
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup build dependencies
+        uses: "./.github/templates/setup-build"
+
+      - name: Format and clippy
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy -- -D warnings
+          cargo clippy --tests -- -D warnings
