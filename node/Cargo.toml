@@ -29,9 +29,11 @@ sc-telemetry = { workspace = true }
 sc-transaction-pool = { workspace = true }
 sc-transaction-pool-api = { workspace = true }
 sc-offchain = { workspace = true }
-sc-consensus-aura = { workspace = true }
-sp-consensus-aura = { workspace = true }
+sc-consensus-babe = { workspace = true }
+sc-consensus-babe-rpc = { workspace = true }
+sp-consensus-babe = { workspace = true }
 sc-consensus = { workspace = true }
+sp-consensus = { workspace = true }
 sc-consensus-grandpa = { workspace = true }
 sp-consensus-grandpa = { workspace = true }
 sc-client-api = { workspace = true }
@@ -40,12 +42,14 @@ sp-io = { workspace = true }
 sp-timestamp = { workspace = true }
 sp-inherents = { workspace = true }
 sp-keyring = { workspace = true }
+sp-keystore = { workspace = true }
 frame-system = { workspace = true }
 pallet-transaction-payment = { workspace = true }
 
 # RPC dependencies
 jsonrpsee = { workspace = true, features = ["server"] }
 sp-api = { workspace = true }
+sc-rpc = { workspace = true }
 sc-rpc-api = { workspace = true }
 sp-blockchain = { workspace = true }
 sp-block-builder = { workspace = true }
