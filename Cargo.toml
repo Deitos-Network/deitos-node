@@ -10,7 +10,7 @@ repository = "https://github.com/Deitos-Network/deitos-node.git"
 resolver = "2"
 members = [
     "node",
-    "pallets/template",
+    "pallets/deitos",
     "runtime",
 ]
 
