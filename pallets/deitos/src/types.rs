@@ -9,11 +9,9 @@ pub type Installment = BalanceOf<T>;
 pub type PaymentsDetails = (Installment, PaymentPlanPeriods);
 pub type PaymentPlan = BoundedVec<PaymentsDetails<T>, MaxPaymentPlanDuration<T>>;
 
-
-
 // TO-DO: Review the necessary status.
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
-pub type IPStatus = enum {
+pub IPStatus enum {
     VALIDATING,
     ACTIVE,
     INACTIVE,
@@ -22,7 +20,7 @@ pub type IPStatus = enum {
 }
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
-pub type AgreementStatus = enum {
+pub AgreementStatus enum {
     CONSUMER_REQUEST,
     IP_ACCEPTED,
     IP_ACCEPTED_WITH_MODIFICATIONS,
@@ -38,7 +36,7 @@ pub type AgreementStatus = enum {
 };
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
-pub type PaymentPlanPeriods = enum {
+pub PaymentPlanPeriods enum {
     WEEKLY,
     BIWEEKLY,
     MONTHLY,
