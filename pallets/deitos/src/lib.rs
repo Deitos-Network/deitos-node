@@ -1,12 +1,12 @@
 // Deitos pallet
 // Documentation under development !!!
-
+#![allow(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
-
-pub use pallet::*;
-
+#[warn(unused_imports)]
 #[cfg(test)]
 mod mock;
+
+pub use pallet::*;
 
 #[cfg(test)]
 mod tests;
@@ -17,14 +17,35 @@ pub use types::*;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod weights;
+
+use frame_support::{
+    dispatch::DispatchResult,
+    pallet_prelude::*,
+    traits::{
+        tokens::fungible::{
+            self,
+            hold::{
+                Balanced as BalancedHold, Mutate as FunHoldMutate, Unbalanced as FunHoldUnbalanced,
+            },
+            Inspect as FunInspect,
+        },
+        Get,
+    },
+    PalletId,
+};
+pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use sp_std::{convert::TryInto, prelude::*};
+
+use sp_runtime::{
+    traits::{One, Saturating, StaticLookup, Zero},
+    BoundedVec,
+};
 pub use weights::*;
 
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
-    use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
@@ -32,6 +53,15 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         /// The overarching runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+        /// The fungible used for deposits.
+        type Currency: FunHoldMutate<Self::AccountId, Reason = Self::RuntimeHoldReason>
+            + FunInspect<Self::AccountId>
+            + BalancedHold<Self::AccountId>
+            + FunHoldUnbalanced<Self::AccountId>;
+
+        /// Overarching hold reason.
+        type RuntimeHoldReason: From<HoldReason>;
 
         /// A type representing the weights required by the dispatchables of this pallet.
         type WeightInfo: WeightInfo;
@@ -54,6 +84,13 @@ pub mod pallet {
         type PalletId: Get<PalletId>;
     }
 
+    /// A reason for the NIS pallet placing a hold on funds.
+    #[pallet::composite_enum]
+    pub enum HoldReason {
+        #[codec(index = 0)]
+        Transfer,
+    }
+
     #[pallet::storage]
     #[pallet::getter(fn get_ip)]
     pub type InfrastructureProvider<T: Config> =
@@ -68,7 +105,7 @@ pub mod pallet {
             NMapKey<Blake2_128Concat, T::AccountId>,   // infrastructure provider
             NMapKey<Blake2_128Concat, T::AgreementId>, // agreement id
         ),
-        Agreement<T>,
+        AgreementDetails<T>,
         ResultQuery<Error<T>::NonExistentStorageValue>,
     >;
 
@@ -89,8 +126,8 @@ pub mod pallet {
     pub enum Error<T> {
         /// The value retrieved was `None` as no value was previously set.
         NoneValue,
-        /// There was an attempt to increment the value in storage over `u32::MAX`.
         StorageOverflow,
+        NonExistentStorageValue,
     }
 
     #[pallet::call]
@@ -115,15 +152,6 @@ pub mod pallet {
         }
 
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::update_ip_details())]
-        pub fn update_ip_details(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
-
-            Ok(())
-        }
-
-        #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::shutdown_ip())]
         pub fn shutdown_ip(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
@@ -132,12 +160,15 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(4)]
+        #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::shutdown_ip())]
         pub fn submit_agreement_request(
             origin: OriginFor<T>,
             provider: AccountIdLookupOf<T>,
-            agreement: Agreement<T>,
+            storage: Storage,
+            time_allocation: AgreementTimeAllocation,
+            activation_block: BlockNumberFor<T>,
+            payment_plan: PaymentPlan<T>,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
@@ -145,13 +176,13 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(5)]
+        #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::ip_agreement_reponse())]
         pub fn ip_agreement_reponse(
             origin: OriginFor<T>,
             consumer: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
-            agreement: Agreement<T>,
+            payment_plan: Option<PaymentPlan<T>>,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
@@ -169,7 +200,6 @@ pub mod pallet {
             origin: OriginFor<T>,
             provider: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
-            agreement: Agreement<T>,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
@@ -181,13 +211,12 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(5)]
+        #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::consumer_cancels_agreement())]
         pub fn consumer_cancels_agreement(
             origin: OriginFor<T>,
             provider: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
-            agreement: Agreement<T>,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
@@ -195,13 +224,12 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(6)]
+        #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::ip_cancels_agreement())]
         pub fn ip_cancels_agreement(
             origin: OriginFor<T>,
             consumer: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
-            agreement: Agreement<T>,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
@@ -209,7 +237,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(6)]
+        #[pallet::call_index(8)]
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
             origin: OriginFor<T>,
@@ -222,7 +250,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(7)]
+        #[pallet::call_index(9)]
         #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
         pub fn withdraw_provider_funds(
             origin: OriginFor<T>,
@@ -235,20 +263,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(8)]
-        #[pallet::weight(T::WeightInfo::ip_withdraw())]
-        pub fn withdraw_provider_funds(
-            origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
-        ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
-
-            Ok(())
-        }
-
-        #[pallet::call_index(8)]
+        #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
         pub fn submit_provider_feedback(
             origin: OriginFor<T>,
@@ -261,7 +276,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(9)]
+        #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
         pub fn submit_consumer_feedback(
             origin: OriginFor<T>,

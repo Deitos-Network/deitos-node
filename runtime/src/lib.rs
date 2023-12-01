@@ -36,7 +36,7 @@ pub use frame_support::{
         },
         IdentityFee, Weight,
     },
-    StorageValue,
+    PalletId, StorageValue,
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
@@ -46,11 +46,10 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
+mod deitos;
+
 mod constants;
 use crate::constants::time::*;
-
-/// Import the deitos pallet.
-pub use pallet_deitos;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -259,7 +258,7 @@ impl pallet_balances::Config for Runtime {
     type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
     type FreezeIdentifier = ();
     type MaxFreezes = ();
-    type RuntimeHoldReason = ();
+    type RuntimeHoldReason = RuntimeHoldReason;
     type RuntimeFreezeReason = ();
     type MaxHolds = ();
 }
@@ -283,12 +282,6 @@ impl pallet_sudo::Config for Runtime {
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
-/// Configure the pallet-deitos in pallets/deitos.
-impl pallet_deitos::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = pallet_deitos::weights::SubstrateWeight<Runtime>;
-}
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
     pub struct Runtime {
@@ -299,7 +292,6 @@ construct_runtime!(
         Balances: pallet_balances,
         TransactionPayment: pallet_transaction_payment,
         Sudo: pallet_sudo,
-        // Include the custom logic from the pallet-deitos in the runtime.
         Deitos: pallet_deitos,
     }
 );

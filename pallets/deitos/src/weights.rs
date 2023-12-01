@@ -35,15 +35,124 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet_template.
 pub trait WeightInfo {
 	fn register_ip() -> Weight;
-	fn cause_error() -> Weight;
+	fn update_ip_details() -> Weight;
+	fn shutdown_ip() -> Weight;
+	fn submit_agreement_request() -> Weight;
+	fn ip_agreement_reponse() -> Weight;
+	fn consumer_agreement_reponse() -> Weight;
+	fn consumer_cancels_agreement() -> Weight;
+	fn ip_cancels_agreement() -> Weight;
+	fn make_installment_payment() -> Weight;
+	fn withdraw_provider_funds() -> Weight;
+	fn submit_provider_feedback() -> Weight;	
+	fn submit_consumer_feedback() -> Weight;
+
 }
 
 /// Weights for pallet_template using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-	/// Storage: TemplateModule Something (r:0 w:1)
-	/// Proof: TemplateModule Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
 	fn register_ip() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn update_ip_details() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	fn shutdown_ip() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn submit_agreement_request() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn ip_agreement_reponse() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn consumer_agreement_reponse() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn consumer_cancels_agreement() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn ip_cancels_agreement() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn make_installment_payment() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn withdraw_provider_funds() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn submit_provider_feedback() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn submit_consumer_feedback() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -55,9 +164,120 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 
 // For backwards compatibility and tests
 impl WeightInfo for () {
-	/// Storage: TemplateModule Something (r:0 w:1)
-	/// Proof: TemplateModule Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
 	fn register_ip() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn update_ip_details() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn shutdown_ip() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn submit_agreement_request() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn ip_agreement_reponse() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn consumer_agreement_reponse() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn consumer_cancels_agreement() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn ip_cancels_agreement() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn make_installment_payment() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn withdraw_provider_funds() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn submit_provider_feedback() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn submit_consumer_feedback() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

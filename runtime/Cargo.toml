@@ -51,7 +51,7 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-system-benchmarking = { workspace = true, optional = true }
 
 # Local Dependencies
-pallet-template = { path = "../pallets/template", default-features = false }
+pallet-deitos = { path = "../pallets/deitos", default-features = false }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -69,9 +69,9 @@ std = [
     "frame-try-runtime?/std",
     "pallet-babe/std",
     "pallet-balances/std",
+        "pallet-deitos/std",
     "pallet-grandpa/std",
     "pallet-sudo/std",
-    "pallet-template/std",
     "pallet-timestamp/std",
     "pallet-transaction-payment-rpc-runtime-api/std",
     "pallet-transaction-payment/std",
@@ -102,7 +102,7 @@ runtime-benchmarks = [
     "pallet-balances/runtime-benchmarks",
     "pallet-grandpa/runtime-benchmarks",
     "pallet-sudo/runtime-benchmarks",
-    "pallet-template/runtime-benchmarks",
+    "pallet-deitos/runtime-benchmarks",
     "pallet-timestamp/runtime-benchmarks",
     "sp-runtime/runtime-benchmarks",
 ]
@@ -115,7 +115,7 @@ try-runtime = [
     "pallet-balances/try-runtime",
     "pallet-grandpa/try-runtime",
     "pallet-sudo/try-runtime",
-    "pallet-template/try-runtime",
+    "pallet-deitos/try-runtime",
     "pallet-timestamp/try-runtime",
     "pallet-transaction-payment/try-runtime",
     "sp-runtime/try-runtime",
