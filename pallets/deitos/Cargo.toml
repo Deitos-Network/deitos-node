@@ -1,7 +1,7 @@
 [package]
-name = "pallet-template"
+name = "pallet-deitos"
 version = "4.0.0-dev"
-description = "FRAME pallet template for defining custom runtime logic."
+description = "Pallet for Deitos Network logic"
 authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
 homepage = "https://substrate.io"
 edition.workspace = true
@@ -19,11 +19,13 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 sp-std = { workspace = true }
+sp-runtime = { workspace = true, default-features = true }
 
 [dev-dependencies]
 sp-core = { workspace = true, default-features = true }
 sp-io = { workspace = true, default-features = true }
-sp-runtime = { workspace = true, default-features = true }
+pallet-balances =  { workspace = true, default-features = true }
+
 
 [features]
 default = ["std"]
