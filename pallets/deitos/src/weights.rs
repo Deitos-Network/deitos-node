@@ -35,7 +35,7 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet_template.
 pub trait WeightInfo {
 	fn register_ip() -> Weight;
-	fn update_ip_details() -> Weight;
+	fn update_ip_storage() -> Weight;
 	fn shutdown_ip() -> Weight;
 	fn submit_agreement_request() -> Weight;
 	fn ip_agreement_reponse() -> Weight;
@@ -63,7 +63,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn update_ip_details() -> Weight {
+	fn update_ip_storage() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -177,7 +177,7 @@ impl WeightInfo for () {
 
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn update_ip_details() -> Weight {
+	fn update_ip_storage() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

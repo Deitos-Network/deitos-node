@@ -32,9 +32,15 @@ fn test_correct_ip_registration() {
             InfraProviderDetails::<Test> {
                 price_storage_per_block,
                 total_storage,
-                available_storage: total_storage,
+                reserved_storage: Zero::zero(),
                 status: IPStatus::Validating,
             }
         );
+
+        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPRegistered {
+            ip: 1,
+            price_storage_per_block,
+            total_storage,
+        }));
     });
 }

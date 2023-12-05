@@ -59,7 +59,7 @@ pub struct InfraProviderDetails<T: pallet::Config> {
     /// Total IP Storage
     pub total_storage: Storage,
     // Available IP Storage
-    pub available_storage: Storage,
+    pub reserved_storage: Storage,
     // IP Status
     pub status: IPStatus,
 }

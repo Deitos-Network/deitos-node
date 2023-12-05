@@ -136,11 +136,10 @@ pub mod pallet {
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// A user has successfully set a new value.
-        SomethingStored {
-            /// The new value set.
-            something: u32,
-            /// The account who set the new value.
-            who: T::AccountId,
+        IPRegistered {
+            ip: T::AccountId,
+            price_storage_per_block: BalanceOf<T>,
+            total_storage: Storage,
         },
     }
 
@@ -148,9 +147,11 @@ pub mod pallet {
     #[pallet::error]
     pub enum Error<T> {
         /// The value retrieved was `None` as no value was previously set.
-        NoneValue,
-        StorageOverflow,
         NonExistentStorageValue,
+        /// Math overflow
+        Overflow,
+        /// Insufficient storage
+        InsufficientStorage,
     }
 
     #[pallet::call]
@@ -164,28 +165,62 @@ pub mod pallet {
             total_storage: Storage,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
             let bounding_amount = IPBoundingAmount::<T>::get()?;
 
-            T::Currency::hold(&HoldReason::Transfer.into(), &who, bounding_amount)?;
+            T::Currency::hold(&HoldReason::Transfer.into(), &ip, bounding_amount)?;
 
             let ip_details = InfraProviderDetails::<T> {
                 price_storage_per_block,
                 total_storage,
-                available_storage: total_storage,
+                reserved_storage: Zero::zero(),
                 status: IPStatus::Validating,
             };
 
-            InfrastructureProvider::<T>::insert(&who, ip_details);
+            InfrastructureProvider::<T>::insert(&ip, ip_details);
+
+            Self::deposit_event(Event::IPRegistered {
+                ip,
+                price_storage_per_block,
+                total_storage,
+            });
 
             Ok(())
         }
 
         #[pallet::call_index(1)]
-        #[pallet::weight(T::WeightInfo::update_ip_details())]
-        pub fn update_ip_details(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
+        #[pallet::weight(T::WeightInfo::update_ip_storage())]
+        pub fn update_ip_storage(
+            origin: OriginFor<T>,
+            price_storage_per_block: BalanceOf<T>,
+            total_storage: Storage,
+        ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
+
+            InfrastructureProvider::<T>::try_mutate(
+                &ip,
+                |ip_details| -> Result<_, DispatchError> {
+                    let ip_details = ip_details
+                        .as_mut()
+                        .ok_or(Error::<T>::NonExistentStorageValue)?;
+
+                    // Check if the new total_storage is enough to cover the current reserved_storage
+                    ensure!(
+                        total_storage >= ip_details.reserved_storage,
+                        Error::<T>::InsufficientStorage // You need to define this error
+                    );
+
+                    ip_details.price_storage_per_block = price_storage_per_block;
+                    ip_details.total_storage = total_storage;
+                    // Note: This calculation might need to be reviewed or adjusted.
+                    ip_details.reserved_storage = ip_details
+                        .total_storage
+                        .saturating_sub(ip_details.reserved_storage);
+
+                    Ok(())
+                },
+            )?;
 
             Ok(())
         }

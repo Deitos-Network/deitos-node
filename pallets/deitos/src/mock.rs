@@ -1,5 +1,5 @@
 use super::*;
-use crate as pallet_deitos;
+pub use crate as pallet_deitos;
 use frame_support::{
     parameter_types,
     traits::{ConstU16, ConstU32, ConstU64},
