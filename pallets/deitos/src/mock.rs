@@ -2,7 +2,7 @@ use super::*;
 use crate as pallet_deitos;
 use frame_support::{
     parameter_types,
-    traits::{ConstU16, ConstU32, ConstU64},
+    traits::{ConstU32, ConstU64},
 };
 use sp_core::H256;
 use sp_runtime::{
@@ -30,6 +30,7 @@ type AccountId = u64;
 type AssetId = u32;
 
 impl frame_system::Config for Test {
+    type RuntimeEvent = RuntimeEvent;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
@@ -41,7 +42,6 @@ impl frame_system::Config for Test {
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Block = Block;
-    type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = ConstU64<250>;
     type DbWeight = ();
     type Version = ();
@@ -56,27 +56,27 @@ impl frame_system::Config for Test {
 }
 
 impl pallet_balances::Config for Test {
-    type Balance = u64;
-    type DustRemoval = ();
     type RuntimeEvent = RuntimeEvent;
-    type ExistentialDeposit = ConstU64<1>;
-    type AccountStore = System;
-    type WeightInfo = ();
-    type MaxLocks = ();
-    type MaxReserves = ();
-    type ReserveIdentifier = [u8; 8];
     type RuntimeHoldReason = RuntimeHoldReason;
     type RuntimeFreezeReason = ();
+    type WeightInfo = ();
+    type Balance = u64;
+    type DustRemoval = ();
+    type ExistentialDeposit = ConstU64<1>;
+    type AccountStore = System;
+    type ReserveIdentifier = [u8; 8];
     type FreezeIdentifier = ();
+    type MaxLocks = ();
+    type MaxReserves = ();
     type MaxHolds = ConstU32<250>;
     type MaxFreezes = ();
 }
 
 impl pallet_deitos::Config for Test {
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
     type Currency = Balances;
     type RuntimeHoldReason = RuntimeHoldReason;
+    type WeightInfo = ();
     type AgreementId = u32;
     type MaxPaymentPlanDuration = ConstU32<500>;
     type PalletId = DeitosPalletId;
