@@ -80,6 +80,10 @@ pub mod pallet {
         #[pallet::constant]
         type MaxPaymentPlanDuration: Get<u32>;
 
+        /// Maximum Plan Duration
+        #[pallet::constant]
+        type MaxAgreements: Get<u32>;
+
         #[pallet::constant]
         type PalletId: Get<PalletId>;
     }
@@ -90,6 +94,25 @@ pub mod pallet {
         #[codec(index = 0)]
         Transfer,
     }
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// Genesis Initial IP Bounding
+        pub initial_ip_bounding: BalanceOf<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            IPBoundingAmount::<T>::put(&self.initial_ip_bounding);
+        }
+    }
+
+    #[pallet::storage]
+    #[pallet::getter(fn ip_bounding_amount)]
+    pub type IPBoundingAmount<T: Config> =
+        StorageValue<_, BalanceOf<T>, ResultQuery<Error<T>::NonExistentStorageValue>>;
 
     #[pallet::storage]
     #[pallet::getter(fn get_ip)]
@@ -135,9 +158,25 @@ pub mod pallet {
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::register_ip())]
         /* to add more parameters*/
-        pub fn register_ip(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
+        pub fn register_ip(
+            origin: OriginFor<T>,
+            price_storage_per_block: BalanceOf<T>,
+            total_storage: Storage,
+        ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let who = ensure_signed(origin)?;
+            let bounding_amount = IPBoundingAmount::<T>::get()?;
+
+            T::Currency::hold(&HoldReason::Transfer.into(), &who, bounding_amount)?;
+
+            let ip_details = InfraProviderDetails::<T> {
+                price_storage_per_block,
+                total_storage,
+                available_storage: total_storage,
+                status: IPStatus::Validating,
+            };
+
+            InfrastructureProvider::<T>::insert(&who, ip_details);
 
             Ok(())
         }

@@ -55,7 +55,11 @@ pub enum PaymentPlanPeriods {
 #[codec(mel_bound(T: pallet::Config))]
 pub struct InfraProviderDetails<T: pallet::Config> {
     // Price per block
-    pub price_per_block: BalanceOf<T>,
+    pub price_storage_per_block: BalanceOf<T>,
+    /// Total IP Storage
+    pub total_storage: Storage,
+    // Available IP Storage
+    pub available_storage: Storage,
     // IP Status
     pub status: IPStatus,
 }
