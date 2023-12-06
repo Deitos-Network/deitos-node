@@ -27,8 +27,8 @@ jobs:
 
       - name: Build the project
         run: |
-          cargo build --workspace
+          cargo build --workspace --locked
 
       - name: Run tests
         run: |
-          cargo test
+          cargo test --features runtime-benchmarks --locked

@@ -69,7 +69,7 @@ std = [
     "frame-try-runtime?/std",
     "pallet-babe/std",
     "pallet-balances/std",
-        "pallet-deitos/std",
+    "pallet-deitos/std",
     "pallet-grandpa/std",
     "pallet-sudo/std",
     "pallet-timestamp/std",
