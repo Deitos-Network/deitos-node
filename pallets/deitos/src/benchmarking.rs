@@ -15,9 +15,11 @@ mod benchmarks {
     #[benchmark]
     fn register_ip() {
         let value = 100u32.into();
+        let total_storage = 1000u64.into();
+
         let caller: T::AccountId = whitelisted_caller();
         #[extrinsic_call]
-        _(RawOrigin::Signed(caller), value);
+        _(RawOrigin::Signed(caller), value, total_storage);
     }
 
     impl_benchmark_test_suite!(Deitos, crate::mock::new_test_ext(), crate::mock::Test);
