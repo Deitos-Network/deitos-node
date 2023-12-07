@@ -34,6 +34,7 @@ fn test_correct_ip_registration() {
                 total_storage,
                 reserved_storage: Zero::zero(),
                 status: IPStatus::Validating,
+                active_agreements: BoundedVec::new()
             }
         );
 

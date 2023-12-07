@@ -80,7 +80,7 @@ pub mod pallet {
         #[pallet::constant]
         type MaxPaymentPlanDuration: Get<u32>;
 
-        /// Maximum Plan Duration
+        /// Maximum number of agreements per consumer
         #[pallet::constant]
         type MaxAgreements: Get<u32>;
 
@@ -120,14 +120,13 @@ pub mod pallet {
         StorageMap<_, Blake2_128Concat, T::AccountId, InfraProviderDetails<T>>;
 
     #[pallet::storage]
-    #[pallet::getter(fn get_agreements)]
-    pub type Agreements<T: Config> = StorageNMap<
+    #[pallet::getter(fn agreements)]
+    pub(super) type Agreements<T: Config> = StorageDoubleMap<
         _,
-        (
-            NMapKey<Blake2_128Concat, T::AccountId>,   // consumer
-            NMapKey<Blake2_128Concat, T::AccountId>,   // infrastructure provider
-            NMapKey<Blake2_128Concat, T::AgreementId>, // agreement id
-        ),
+        Blake2_128Concat,
+        T::AccountId, // Consumer
+        Blake2_128Concat,
+        T::AccountId, // Provider
         AgreementDetails<T>,
         ResultQuery<Error<T>::NonExistentStorageValue>,
     >;
@@ -141,6 +140,18 @@ pub mod pallet {
             price_storage_per_block: BalanceOf<T>,
             total_storage: Storage,
         },
+        IPStorageUpdated {
+            ip: T::AccountId,
+            price_storage_per_block: BalanceOf<T>,
+            total_storage: Storage,
+        },
+        IPStatusChanged {
+            ip: T::AccountId,
+            status: IPStatus,
+        },
+        IPShutdown {
+            ip: T::AccountId,
+        },
     }
 
     /// information.
@@ -152,6 +163,8 @@ pub mod pallet {
         Overflow,
         /// Insufficient storage
         InsufficientStorage,
+        /// On going agreements
+        OnGoingAgreements,
     }
 
     #[pallet::call]
@@ -175,6 +188,7 @@ pub mod pallet {
                 total_storage,
                 reserved_storage: Zero::zero(),
                 status: IPStatus::Validating,
+                active_agreements: BoundedVec::new(),
             };
 
             InfrastructureProvider::<T>::insert(&ip, ip_details);
@@ -188,7 +202,41 @@ pub mod pallet {
             Ok(())
         }
 
+        /// This is a temporary call to manage the IP status.
+        /// Statuses updates should be done automatically after an environment software check.
         #[pallet::call_index(1)]
+        #[pallet::weight(T::WeightInfo::register_ip())]
+        pub fn update_ip_status(
+            origin: OriginFor<T>,
+            provider: AccountIdLookupOf<T>,
+            status: IPStatus,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+            let bounding_amount = IPBoundingAmount::<T>::get()?;
+            let ip = T::Lookup::lookup(provider)?;
+
+            InfrastructureProvider::<T>::try_mutate(
+                &ip,
+                |ip_details| -> Result<_, DispatchError> {
+                    let ip_details = ip_details
+                        .as_mut()
+                        .ok_or(Error::<T>::NonExistentStorageValue)?;
+
+                    ip_details.status = status.clone();
+
+                    Self::deposit_event(Event::IPStatusChanged {
+                        ip: ip.clone(),
+                        status,
+                    });
+
+                    Ok(())
+                },
+            )?;
+
+            Ok(())
+        }
+
+        #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::update_ip_storage())]
         pub fn update_ip_storage(
             origin: OriginFor<T>,
@@ -208,7 +256,7 @@ pub mod pallet {
                     // Check if the new total_storage is enough to cover the current reserved_storage
                     ensure!(
                         total_storage >= ip_details.reserved_storage,
-                        Error::<T>::InsufficientStorage // You need to define this error
+                        Error::<T>::InsufficientStorage
                     );
 
                     ip_details.price_storage_per_block = price_storage_per_block;
@@ -218,6 +266,12 @@ pub mod pallet {
                         .total_storage
                         .saturating_sub(ip_details.reserved_storage);
 
+                    Self::deposit_event(Event::IPStorageUpdated {
+                        ip: ip.clone(),
+                        price_storage_per_block,
+                        total_storage,
+                    });
+
                     Ok(())
                 },
             )?;
@@ -225,16 +279,36 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(2)]
+        #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::shutdown_ip())]
         pub fn shutdown_ip(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
+
+            InfrastructureProvider::<T>::try_mutate(
+                &ip,
+                |ip_details| -> Result<_, DispatchError> {
+                    let ip_details = ip_details
+                        .as_mut()
+                        .ok_or(Error::<T>::NonExistentStorageValue)?;
+
+                    ensure!(
+                        ip_details.active_agreements.len() > 0,
+                        Error::<T>::OnGoingAgreements
+                    );
+
+                    ip_details.status = IPStatus::Shutdown;
+
+                    Self::deposit_event(Event::IPShutdown { ip: ip.clone() });
+
+                    Ok(())
+                },
+            )?;
 
             Ok(())
         }
 
-        #[pallet::call_index(3)]
+        #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::shutdown_ip())]
         pub fn submit_agreement_request(
             origin: OriginFor<T>,
@@ -250,7 +324,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(4)]
+        #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::ip_agreement_reponse())]
         pub fn ip_agreement_reponse(
             origin: OriginFor<T>,
@@ -268,7 +342,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(5)]
+        #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::consumer_agreement_reponse())]
         pub fn consumer_agreement_reponse(
             origin: OriginFor<T>,
@@ -285,7 +359,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(6)]
+        #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::consumer_cancels_agreement())]
         pub fn consumer_cancels_agreement(
             origin: OriginFor<T>,
@@ -298,7 +372,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(7)]
+        #[pallet::call_index(8)]
         #[pallet::weight(T::WeightInfo::ip_cancels_agreement())]
         pub fn ip_cancels_agreement(
             origin: OriginFor<T>,
@@ -311,7 +385,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(8)]
+        #[pallet::call_index(9)]
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
             origin: OriginFor<T>,
@@ -324,7 +398,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(9)]
+        #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
         pub fn withdraw_provider_funds(
             origin: OriginFor<T>,
@@ -337,7 +411,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(10)]
+        #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
         pub fn submit_provider_feedback(
             origin: OriginFor<T>,
@@ -350,7 +424,6 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
         pub fn submit_consumer_feedback(
             origin: OriginFor<T>,

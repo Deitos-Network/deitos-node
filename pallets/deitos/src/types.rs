@@ -13,15 +13,17 @@ pub type AgreementTimeAllocation = u32;
 pub type Installment<T> = BalanceOf<T>;
 pub type PaymentsDetails<T> = (Installment<T>, PaymentPlanPeriods);
 pub type PaymentPlan<T> = BoundedVec<PaymentsDetails<T>, <T as Config>::MaxPaymentPlanDuration>;
+pub type ActiveAgreements<T> = BoundedVec<<T as Config>::AgreementId, <T as Config>::MaxAgreements>;
 
 // TO-DO: Review the necessary status.
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
 pub enum IPStatus {
     Validating,
+    NotReady,
     Active,
     Inactive,
     Suspended,
-    Terminated,
+    Shutdown,
 }
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
@@ -62,12 +64,15 @@ pub struct InfraProviderDetails<T: pallet::Config> {
     pub reserved_storage: Storage,
     // IP Status
     pub status: IPStatus,
+    // Track of active agreements
+    pub active_agreements: ActiveAgreements<T>,
 }
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
 pub struct AgreementDetails<T: pallet::Config> {
+    pub id: T::AgreementId,
     // Agreement Status
     pub status: AgreementStatus,
     // Total amount of storage in the agreement expressed in bytes?
