@@ -92,32 +92,32 @@ pub mod pallet {
     #[pallet::composite_enum]
     pub enum HoldReason {
         #[codec(index = 0)]
-        Transfer,
+        IPInitialDeposit,
     }
 
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
-        /// Genesis Initial IP Bounding
-        pub initial_ip_bounding: BalanceOf<T>,
+        /// Genesis Initial IP Deposit
+        pub initial_ip_deposit: BalanceOf<T>,
     }
 
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            IPBoundingAmount::<T>::put(&self.initial_ip_bounding);
+            IPDepositAmount::<T>::put(&self.initial_ip_deposit);
         }
     }
 
     #[pallet::storage]
-    #[pallet::getter(fn ip_bounding_amount)]
-    pub type IPBoundingAmount<T: Config> =
+    #[pallet::getter(fn ip_deposit_amount)]
+    pub type IPDepositAmount<T: Config> =
         StorageValue<_, BalanceOf<T>, ResultQuery<Error<T>::NonExistentStorageValue>>;
 
     #[pallet::storage]
     #[pallet::getter(fn get_ip)]
     pub type InfrastructureProvider<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, InfraProviderDetails<T>>;
+        StorageMap<_, Blake2_128Concat, T::AccountId, IPDetails<T>>;
 
     #[pallet::storage]
     #[pallet::getter(fn agreements)]
@@ -149,7 +149,7 @@ pub mod pallet {
             ip: T::AccountId,
             status: IPStatus,
         },
-        IPShutdown {
+        IPUnregistered {
             ip: T::AccountId,
         },
     }
@@ -179,11 +179,11 @@ pub mod pallet {
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
-            let bounding_amount = IPBoundingAmount::<T>::get()?;
+            let deposit_amount = IPDepositAmount::<T>::get()?;
 
-            T::Currency::hold(&HoldReason::Transfer.into(), &ip, bounding_amount)?;
+            T::Currency::hold(&HoldReason::IPInitialDeposit.into(), &ip, deposit_amount)?;
 
-            let ip_details = InfraProviderDetails::<T> {
+            let ip_details = IPDetails::<T> {
                 price_storage_per_block,
                 total_storage,
                 reserved_storage: Zero::zero(),
@@ -208,15 +208,14 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::register_ip())]
         pub fn update_ip_status(
             origin: OriginFor<T>,
-            provider: AccountIdLookupOf<T>,
+            ip: AccountIdLookupOf<T>,
             status: IPStatus,
         ) -> DispatchResult {
             ensure_root(origin)?;
-            let bounding_amount = IPBoundingAmount::<T>::get()?;
-            let ip = T::Lookup::lookup(provider)?;
+            let provider = T::Lookup::lookup(provider)?;
 
             InfrastructureProvider::<T>::try_mutate(
-                &ip,
+                &provider,
                 |ip_details| -> Result<_, DispatchError> {
                     let ip_details = ip_details
                         .as_mut()
@@ -224,14 +223,14 @@ pub mod pallet {
 
                     ip_details.status = status.clone();
 
-                    Self::deposit_event(Event::IPStatusChanged {
-                        ip: ip.clone(),
-                        status,
-                    });
-
                     Ok(())
                 },
             )?;
+
+            Self::deposit_event(Event::IPStatusChanged {
+                ip: provider.clone(),
+                status,
+            });
 
             Ok(())
         }
@@ -261,27 +260,23 @@ pub mod pallet {
 
                     ip_details.price_storage_per_block = price_storage_per_block;
                     ip_details.total_storage = total_storage;
-                    // Note: This calculation might need to be reviewed or adjusted.
-                    ip_details.reserved_storage = ip_details
-                        .total_storage
-                        .saturating_sub(ip_details.reserved_storage);
-
-                    Self::deposit_event(Event::IPStorageUpdated {
-                        ip: ip.clone(),
-                        price_storage_per_block,
-                        total_storage,
-                    });
 
                     Ok(())
                 },
             )?;
 
+            Self::deposit_event(Event::IPStorageUpdated {
+                ip: ip.clone(),
+                price_storage_per_block,
+                total_storage,
+            });
+
             Ok(())
         }
 
         #[pallet::call_index(3)]
-        #[pallet::weight(T::WeightInfo::shutdown_ip())]
-        pub fn shutdown_ip(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
+        #[pallet::weight(T::WeightInfo::unregister_ip())]
+        pub fn unregister_ip(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
 
@@ -297,22 +292,20 @@ pub mod pallet {
                         Error::<T>::OnGoingAgreements
                     );
 
-                    ip_details.status = IPStatus::Shutdown;
-
-                    Self::deposit_event(Event::IPShutdown { ip: ip.clone() });
+                    ip_details.status = IPStatus::Unregistered;
 
                     Ok(())
                 },
             )?;
-
+            Self::deposit_event(Event::IPUnregistered { ip: ip.clone() });
             Ok(())
         }
 
         #[pallet::call_index(4)]
-        #[pallet::weight(T::WeightInfo::shutdown_ip())]
+        #[pallet::weight(T::WeightInfo::unregister_ip())]
         pub fn submit_agreement_request(
             origin: OriginFor<T>,
-            provider: AccountIdLookupOf<T>,
+            ip: AccountIdLookupOf<T>,
             storage: Storage,
             time_allocation: AgreementTimeAllocation,
             activation_block: BlockNumberFor<T>,
@@ -346,7 +339,7 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::consumer_agreement_reponse())]
         pub fn consumer_agreement_reponse(
             origin: OriginFor<T>,
-            provider: AccountIdLookupOf<T>,
+            ip: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
@@ -363,7 +356,7 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::consumer_cancels_agreement())]
         pub fn consumer_cancels_agreement(
             origin: OriginFor<T>,
-            provider: AccountIdLookupOf<T>,
+            ip: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
@@ -389,7 +382,7 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
             origin: OriginFor<T>,
-            provider: AccountIdLookupOf<T>,
+            ip: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
@@ -427,7 +420,7 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
         pub fn submit_consumer_feedback(
             origin: OriginFor<T>,
-            provider: AccountIdLookupOf<T>,
+            ip: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.

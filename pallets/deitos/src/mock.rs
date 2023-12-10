@@ -30,7 +30,7 @@ parameter_types! {
 type AccountId = u64;
 type AssetId = u32;
 
-pub const BOUNDING_AMOUNT: u64 = 1_000_000_000u64;
+pub const DEPOSIT_AMOUNT: u64 = 1_000_000_000u64;
 pub const INITIAL_BALANCE: u64 = 1_000_000_000_000_u64;
 
 impl frame_system::Config for Test {
@@ -105,7 +105,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .unwrap();
 
     pallet_deitos::GenesisConfig::<Test> {
-        initial_ip_bounding: BOUNDING_AMOUNT,
+        initial_ip_deposit: DEPOSIT_AMOUNT,
     }
     .assimilate_storage(&mut t)
     .unwrap();

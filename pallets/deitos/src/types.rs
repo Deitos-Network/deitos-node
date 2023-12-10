@@ -23,7 +23,7 @@ pub enum IPStatus {
     Active,
     Inactive,
     Suspended,
-    Shutdown,
+    Unregistered,
 }
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
@@ -55,7 +55,7 @@ pub enum PaymentPlanPeriods {
 #[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
-pub struct InfraProviderDetails<T: pallet::Config> {
+pub struct IPDetails<T: pallet::Config> {
     // Price per block
     pub price_storage_per_block: BalanceOf<T>,
     /// Total IP Storage

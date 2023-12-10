@@ -36,7 +36,7 @@ use core::marker::PhantomData;
 pub trait WeightInfo {
 	fn register_ip() -> Weight;
 	fn update_ip_storage() -> Weight;
-	fn shutdown_ip() -> Weight;
+	fn unregister_ip() -> Weight;
 	fn submit_agreement_request() -> Weight;
 	fn ip_agreement_reponse() -> Weight;
 	fn consumer_agreement_reponse() -> Weight;
@@ -71,7 +71,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		Weight::from_parts(10_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
-	fn shutdown_ip() -> Weight {
+	fn unregister_ip() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -187,7 +187,7 @@ impl WeightInfo for () {
 	}
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn shutdown_ip() -> Weight {
+	fn unregister_ip() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

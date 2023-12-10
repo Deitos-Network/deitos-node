@@ -16,20 +16,20 @@ fn test_correct_ip_registration() {
 
         assert_eq!(
             <Balances as fungible::InspectHold<_>>::balance_on_hold(
-                &HoldReason::Transfer.into(),
+                &HoldReason::IPInitialDeposit.into(),
                 &1
             ),
-            BOUNDING_AMOUNT
+            DEPOSIT_AMOUNT
         );
 
         assert_eq!(
             <Balances as fungible::Inspect<_>>::balance(&1),
-            INITIAL_BALANCE - BOUNDING_AMOUNT
+            INITIAL_BALANCE - DEPOSIT_AMOUNT
         );
 
         assert_eq!(
             InfrastructureProvider::<Test>::get(1).unwrap(),
-            InfraProviderDetails::<Test> {
+            IPDetails::<Test> {
                 price_storage_per_block,
                 total_storage,
                 reserved_storage: Zero::zero(),
