@@ -212,7 +212,7 @@ pub mod pallet {
             status: IPStatus,
         ) -> DispatchResult {
             ensure_root(origin)?;
-            let provider = T::Lookup::lookup(provider)?;
+            let provider = T::Lookup::lookup(ip)?;
 
             InfrastructureProvider::<T>::try_mutate(
                 &provider,
