@@ -17,22 +17,26 @@ pub use types::*;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod weights;
-
 use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
     traits::{
-        tokens::fungible::{
-            self,
-            hold::{
-                Balanced as BalancedHold, Mutate as FunHoldMutate, Unbalanced as FunHoldUnbalanced,
+        tokens::{
+            fungible::{
+                self,
+                hold::{
+                    Balanced as BalancedHold, Mutate as FunHoldMutate,
+                    Unbalanced as FunHoldUnbalanced,
+                },
+                Inspect as FunInspect,
             },
-            Inspect as FunInspect,
+            Precision::Exact,
         },
         Get,
     },
     PalletId,
 };
+pub use log;
 pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use sp_std::{convert::TryInto, prelude::*};
 
@@ -175,16 +179,26 @@ pub mod pallet {
         InsufficientStorage,
         /// On going agreements
         OnGoingAgreements,
+        /// IP already exists,
+        IPAlreadyExists,
     }
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::register_ip())]
-        /* to add more parameters*/
         pub fn register_ip(origin: OriginFor<T>, total_storage: Storage) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
+
+            // Checks that the IP is either not registered or is registered but with Unregistered status
+            if let Some(ip_details) = InfrastructureProvider::<T>::get(&ip) {
+                ensure!(
+                    ip_details.status == IPStatus::Unregistered,
+                    Error::<T>::IPAlreadyExists
+                );
+            }
+
             let deposit_amount = IPDepositAmount::<T>::get()?;
 
             T::Currency::hold(&HoldReason::IPInitialDeposit.into(), &ip, deposit_amount)?;
@@ -194,10 +208,10 @@ pub mod pallet {
                 reserved_storage: Zero::zero(),
                 status: IPStatus::Validating,
                 active_agreements: BoundedVec::new(),
+                deposit_amount,
             };
 
             InfrastructureProvider::<T>::insert(&ip, ip_details);
-
             Self::deposit_event(Event::IPRegistered { ip, total_storage });
 
             Ok(())
@@ -289,9 +303,17 @@ pub mod pallet {
 
                     ip_details.status = IPStatus::Unregistered;
 
+                    T::Currency::release(
+                        &HoldReason::IPInitialDeposit.into(),
+                        &ip,
+                        ip_details.deposit_amount,
+                        Exact,
+                    )?;
+
                     Ok(())
                 },
             )?;
+
             Self::deposit_event(Event::IPUnregistered { ip: ip.clone() });
             Ok(())
         }

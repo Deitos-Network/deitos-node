@@ -64,6 +64,8 @@ pub struct IPDetails<T: pallet::Config> {
     pub status: IPStatus,
     // Track of active agreements
     pub active_agreements: ActiveAgreements<T>,
+    // Deposit funds
+    pub deposit_amount: BalanceOf<T>,
 }
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]

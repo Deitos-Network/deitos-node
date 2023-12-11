@@ -13,6 +13,7 @@ repository = "https://github.com/substrate-developer-hub/substrate-node-template
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+log = {workspace = true, default-features = false}
 parity-scale-codec = { workspace = true, features = ["derive"] }
 scale-info = { workspace = true, features = ["derive"] }
 frame-benchmarking = { workspace = true, optional = true }
@@ -30,6 +31,7 @@ sp-keystore = { workspace = true }
 [features]
 default = ["std"]
 std = [
+    "log/std",
     "parity-scale-codec/std",
     "frame-benchmarking?/std",
     "frame-support/std",
