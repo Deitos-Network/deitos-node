@@ -19,7 +19,7 @@ mod benchmarks {
 
         let caller: T::AccountId = whitelisted_caller();
         #[extrinsic_call]
-        _(RawOrigin::Signed(caller), value, total_storage);
+        _(RawOrigin::Signed(caller), total_storage);
     }
 
     impl_benchmark_test_suite!(Deitos, crate::mock::new_test_ext(), crate::mock::Test);
