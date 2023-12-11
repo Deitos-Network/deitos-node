@@ -15,7 +15,7 @@ pub type PaymentsDetails<T> = (Installment<T>, PaymentPlanPeriods);
 pub type PaymentPlan<T> = BoundedVec<PaymentsDetails<T>, <T as Config>::MaxPaymentPlanDuration>;
 pub type ActiveAgreements<T> = BoundedVec<<T as Config>::AgreementId, <T as Config>::MaxAgreements>;
 
-// TO-DO: Review the necessary status.
+// TODO: Review the necessary status.
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
 pub enum IPStatus {
     Validating,
@@ -56,11 +56,9 @@ pub enum PaymentPlanPeriods {
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
 pub struct IPDetails<T: pallet::Config> {
-    // Price per block
-    pub price_storage_per_block: BalanceOf<T>,
     /// Total IP Storage
     pub total_storage: Storage,
-    // Available IP Storage
+    // Storage already reserved by agreements
     pub reserved_storage: Storage,
     // IP Status
     pub status: IPStatus,
@@ -85,4 +83,12 @@ pub struct AgreementDetails<T: pallet::Config> {
     pub payment_plan: PaymentPlan<T>,
     // Consumer agreement lock fee.
     pub agreement_lock_fee: BalanceOf<T>,
+}
+
+#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+#[codec(mel_bound(T: pallet::Config))]
+pub struct IPCostsPerUnit<T: pallet::Config> {
+    // Price per block
+    pub price_storage_per_block: BalanceOf<T>,
 }

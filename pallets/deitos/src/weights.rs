@@ -35,8 +35,10 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet_template.
 pub trait WeightInfo {
 	fn register_ip() -> Weight;
+	fn update_ip_status() -> Weight;
 	fn update_ip_storage() -> Weight;
 	fn unregister_ip() -> Weight;
+	fn update_storage_cost_per_unit() -> Weight;
 	fn submit_agreement_request() -> Weight;
 	fn ip_agreement_reponse() -> Weight;
 	fn consumer_agreement_reponse() -> Weight;
@@ -63,6 +65,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
+	fn update_ip_status() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
 	fn update_ip_storage() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
@@ -71,7 +82,17 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		Weight::from_parts(10_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
+	
 	fn unregister_ip() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	fn update_storage_cost_per_unit() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -177,7 +198,7 @@ impl WeightInfo for () {
 
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn update_ip_storage() -> Weight {
+	fn update_ip_status() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -185,7 +206,16 @@ impl WeightInfo for () {
 		Weight::from_parts(10_000_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
-		/// Storage: Deitos Something (r:0 w:1)
+
+	fn update_ip_storage() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+		.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
 	fn unregister_ip() -> Weight {
 		// Proof Size summary in bytes:
@@ -195,6 +225,18 @@ impl WeightInfo for () {
 		Weight::from_parts(10_000_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
+
+	fn update_storage_cost_per_unit() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	
+
+
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
 	fn submit_agreement_request() -> Weight {

@@ -80,7 +80,7 @@ pub mod pallet {
         #[pallet::constant]
         type MaxPaymentPlanDuration: Get<u32>;
 
-        /// Maximum number of agreements per consumer
+        /// Maximum Plan Duration
         #[pallet::constant]
         type MaxAgreements: Get<u32>;
 
@@ -100,12 +100,16 @@ pub mod pallet {
     pub struct GenesisConfig<T: Config> {
         /// Genesis Initial IP Deposit
         pub initial_ip_deposit: BalanceOf<T>,
+        pub initial_ip_costs_per_unit: BalanceOf<T>,
     }
 
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
             IPDepositAmount::<T>::put(&self.initial_ip_deposit);
+            IPUnitCosts::<T>::put(IPCostsPerUnit {
+                price_storage_per_block: self.initial_ip_costs_per_unit,
+            });
         }
     }
 
@@ -113,6 +117,11 @@ pub mod pallet {
     #[pallet::getter(fn ip_deposit_amount)]
     pub type IPDepositAmount<T: Config> =
         StorageValue<_, BalanceOf<T>, ResultQuery<Error<T>::NonExistentStorageValue>>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn ip_cost_per_unit)]
+    pub type IPUnitCosts<T: Config> =
+        StorageValue<_, IPCostsPerUnit<T>, ResultQuery<Error<T>::NonExistentStorageValue>>;
 
     #[pallet::storage]
     #[pallet::getter(fn get_ip)]
@@ -137,12 +146,10 @@ pub mod pallet {
         /// A user has successfully set a new value.
         IPRegistered {
             ip: T::AccountId,
-            price_storage_per_block: BalanceOf<T>,
             total_storage: Storage,
         },
         IPStorageUpdated {
             ip: T::AccountId,
-            price_storage_per_block: BalanceOf<T>,
             total_storage: Storage,
         },
         IPStatusChanged {
@@ -151,6 +158,9 @@ pub mod pallet {
         },
         IPUnregistered {
             ip: T::AccountId,
+        },
+        StoragePriceUnitUpdated {
+            price_storage_per_block: BalanceOf<T>,
         },
     }
 
@@ -172,11 +182,7 @@ pub mod pallet {
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::register_ip())]
         /* to add more parameters*/
-        pub fn register_ip(
-            origin: OriginFor<T>,
-            price_storage_per_block: BalanceOf<T>,
-            total_storage: Storage,
-        ) -> DispatchResult {
+        pub fn register_ip(origin: OriginFor<T>, total_storage: Storage) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
             let deposit_amount = IPDepositAmount::<T>::get()?;
@@ -184,7 +190,6 @@ pub mod pallet {
             T::Currency::hold(&HoldReason::IPInitialDeposit.into(), &ip, deposit_amount)?;
 
             let ip_details = IPDetails::<T> {
-                price_storage_per_block,
                 total_storage,
                 reserved_storage: Zero::zero(),
                 status: IPStatus::Validating,
@@ -193,11 +198,7 @@ pub mod pallet {
 
             InfrastructureProvider::<T>::insert(&ip, ip_details);
 
-            Self::deposit_event(Event::IPRegistered {
-                ip,
-                price_storage_per_block,
-                total_storage,
-            });
+            Self::deposit_event(Event::IPRegistered { ip, total_storage });
 
             Ok(())
         }
@@ -205,7 +206,7 @@ pub mod pallet {
         /// This is a temporary call to manage the IP status.
         /// Statuses updates should be done automatically after an environment software check.
         #[pallet::call_index(1)]
-        #[pallet::weight(T::WeightInfo::register_ip())]
+        #[pallet::weight(T::WeightInfo::update_ip_status())]
         pub fn update_ip_status(
             origin: OriginFor<T>,
             ip: AccountIdLookupOf<T>,
@@ -237,11 +238,7 @@ pub mod pallet {
 
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::update_ip_storage())]
-        pub fn update_ip_storage(
-            origin: OriginFor<T>,
-            price_storage_per_block: BalanceOf<T>,
-            total_storage: Storage,
-        ) -> DispatchResult {
+        pub fn update_ip_storage(origin: OriginFor<T>, total_storage: Storage) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
 
@@ -258,7 +255,6 @@ pub mod pallet {
                         Error::<T>::InsufficientStorage
                     );
 
-                    ip_details.price_storage_per_block = price_storage_per_block;
                     ip_details.total_storage = total_storage;
 
                     Ok(())
@@ -267,7 +263,6 @@ pub mod pallet {
 
             Self::deposit_event(Event::IPStorageUpdated {
                 ip: ip.clone(),
-                price_storage_per_block,
                 total_storage,
             });
 
@@ -276,7 +271,7 @@ pub mod pallet {
 
         #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::unregister_ip())]
-        pub fn unregister_ip(origin: OriginFor<T>, price_unit: BalanceOf<T>) -> DispatchResult {
+        pub fn unregister_ip(origin: OriginFor<T>) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
 
@@ -288,7 +283,7 @@ pub mod pallet {
                         .ok_or(Error::<T>::NonExistentStorageValue)?;
 
                     ensure!(
-                        ip_details.active_agreements.len() > 0,
+                        ip_details.active_agreements.len() == 0,
                         Error::<T>::OnGoingAgreements
                     );
 
@@ -302,6 +297,26 @@ pub mod pallet {
         }
 
         #[pallet::call_index(4)]
+        #[pallet::weight(T::WeightInfo::update_storage_cost_per_unit())]
+        pub fn update_storage_cost_per_unit(
+            origin: OriginFor<T>,
+            price_storage_per_block: BalanceOf<T>,
+        ) -> DispatchResult {
+            // Check that the extrinsic was signed and get the signer.
+            ensure_root(origin)?;
+
+            IPUnitCosts::<T>::put(IPCostsPerUnit {
+                price_storage_per_block: price_storage_per_block.clone(),
+            });
+
+            Self::deposit_event(Event::StoragePriceUnitUpdated {
+                price_storage_per_block,
+            });
+
+            Ok(())
+        }
+
+        #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::unregister_ip())]
         pub fn submit_agreement_request(
             origin: OriginFor<T>,
@@ -317,7 +332,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(5)]
+        #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::ip_agreement_reponse())]
         pub fn ip_agreement_reponse(
             origin: OriginFor<T>,
@@ -335,7 +350,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(6)]
+        #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::consumer_agreement_reponse())]
         pub fn consumer_agreement_reponse(
             origin: OriginFor<T>,
@@ -352,7 +367,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(7)]
+        #[pallet::call_index(8)]
         #[pallet::weight(T::WeightInfo::consumer_cancels_agreement())]
         pub fn consumer_cancels_agreement(
             origin: OriginFor<T>,
@@ -365,7 +380,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(8)]
+        #[pallet::call_index(9)]
         #[pallet::weight(T::WeightInfo::ip_cancels_agreement())]
         pub fn ip_cancels_agreement(
             origin: OriginFor<T>,
@@ -378,7 +393,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(9)]
+        #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
             origin: OriginFor<T>,
@@ -391,7 +406,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(10)]
+        #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
         pub fn withdraw_provider_funds(
             origin: OriginFor<T>,
@@ -404,7 +419,7 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(11)]
+        #[pallet::call_index(12)]
         #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
         pub fn submit_provider_feedback(
             origin: OriginFor<T>,
