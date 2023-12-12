@@ -6,7 +6,11 @@ use sp_std::vec;
 #[allow(unused)]
 use crate::Pallet as Deitos;
 use frame_benchmarking::v2::*;
+use frame_support::{
+    dispatch::DispatchResult, pallet_prelude::*, traits::tokens::fungible::Mutate,
+};
 use frame_system::RawOrigin;
+use log;
 
 #[benchmarks]
 mod benchmarks {
@@ -14,10 +18,15 @@ mod benchmarks {
 
     #[benchmark]
     fn register_ip() {
-        let value = 100u32.into();
-        let total_storage = 1000u64.into();
+        let total_storage: StorageSizeMB = 1000u64;
 
-        let caller: T::AccountId = whitelisted_caller();
+        let account: T::AccountId = account("Alice", 0, 1);
+        let caller = whitelisted_caller();
+
+        let balance: Balance = BalanceOf::<T>::from(1_000_000_000_000_000_000u128);
+
+        T::Currency::mint_into(&caller, 1_000_000_000_000_000_000);
+
         #[extrinsic_call]
         _(RawOrigin::Signed(caller), total_storage);
     }

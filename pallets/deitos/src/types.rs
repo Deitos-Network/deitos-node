@@ -8,7 +8,7 @@ pub type BalanceOf<T> =
     <<T as Config>::Currency as FunInspect<<T as frame_system::Config>::AccountId>>::Balance;
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 pub type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
-pub type Storage = u64;
+pub type StorageSizeMB = u64;
 pub type AgreementTimeAllocation = u32;
 pub type Installment<T> = BalanceOf<T>;
 pub type PaymentsDetails<T> = (Installment<T>, PaymentPlanPeriods);
@@ -56,10 +56,10 @@ pub enum PaymentPlanPeriods {
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
 pub struct IPDetails<T: pallet::Config> {
-    /// Total IP Storage
-    pub total_storage: Storage,
-    // Storage already reserved by agreements
-    pub reserved_storage: Storage,
+    /// Total IP StorageSizeMB
+    pub total_storage: StorageSizeMB,
+    // StorageSizeMB already reserved by agreements
+    pub reserved_storage: StorageSizeMB,
     // IP Status
     pub status: IPStatus,
     // Track of active agreements
@@ -76,7 +76,7 @@ pub struct AgreementDetails<T: pallet::Config> {
     // Agreement Status
     pub status: AgreementStatus,
     // Total amount of storage in the agreement expressed in bytes?
-    pub storage: Storage,
+    pub storage: StorageSizeMB,
     // Amount of time the agreement is valid for in blocks
     pub time_allocation: AgreementTimeAllocation,
     // Activation block

@@ -3,14 +3,14 @@ use crate::{mock::*, types::*, Error, Event};
 use frame_support::{assert_noop, assert_ok};
 
 fn register_ip() {
-    let total_storage: Storage = 10000000_u32.into();
+    let total_storage: StorageSizeMB = 10000000_u32.into();
     assert_ok!(Deitos::register_ip(RuntimeOrigin::signed(1), total_storage));
 }
 
 #[test]
 fn test_correct_ip_registration() {
     new_test_ext().execute_with(|| {
-        let total_storage: Storage = 10000000_u32.into();
+        let total_storage: StorageSizeMB = 10000000_u32.into();
         let price_storage_per_block: BalanceOf<Test> = 1000_u64.into();
 
         register_ip();
@@ -54,7 +54,7 @@ fn test_fail_ip_registration_already_exists() {
         register_ip();
 
         // Attempt to register the same IP again and expect failure
-        let total_storage: Storage = 10000000_u32.into();
+        let total_storage: StorageSizeMB = 10000000_u32.into();
         assert_noop!(
             Deitos::register_ip(RuntimeOrigin::signed(ip), total_storage),
             Error::<Test>::IPAlreadyExists
@@ -156,10 +156,10 @@ fn test_update_ip_storage() {
     new_test_ext().execute_with(|| {
         // Arrange: Register an IP and set initial storage
         let ip = 1;
-        let initial_storage: Storage = 10000000_u32.into();
+        let initial_storage: StorageSizeMB = 10000000_u32.into();
         Deitos::register_ip(RuntimeOrigin::signed(ip), initial_storage).unwrap();
 
-        let new_storage: Storage = 5000000_u32.into();
+        let new_storage: StorageSizeMB = 5000000_u32.into();
 
         // Act: Update the storage capacity for the IP
         assert_ok!(Deitos::update_ip_storage(

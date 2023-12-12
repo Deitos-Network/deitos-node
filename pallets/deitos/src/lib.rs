@@ -28,7 +28,7 @@ use frame_support::{
                     Balanced as BalancedHold, Mutate as FunHoldMutate,
                     Unbalanced as FunHoldUnbalanced,
                 },
-                Inspect as FunInspect,
+                Inspect as FunInspect, Mutate as FunMutate,
             },
             Precision::Exact,
         },
@@ -61,6 +61,7 @@ pub mod pallet {
         /// The fungible used for deposits.
         type Currency: FunHoldMutate<Self::AccountId, Reason = Self::RuntimeHoldReason>
             + FunInspect<Self::AccountId>
+            + FunMutate<Self::AccountId>
             + BalancedHold<Self::AccountId>
             + FunHoldUnbalanced<Self::AccountId>;
 
@@ -150,11 +151,11 @@ pub mod pallet {
         /// A user has successfully set a new value.
         IPRegistered {
             ip: T::AccountId,
-            total_storage: Storage,
+            total_storage: StorageSizeMB,
         },
         IPStorageUpdated {
             ip: T::AccountId,
-            total_storage: Storage,
+            total_storage: StorageSizeMB,
         },
         IPStatusChanged {
             ip: T::AccountId,
@@ -187,7 +188,7 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::register_ip())]
-        pub fn register_ip(origin: OriginFor<T>, total_storage: Storage) -> DispatchResult {
+        pub fn register_ip(origin: OriginFor<T>, total_storage: StorageSizeMB) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
 
@@ -252,7 +253,10 @@ pub mod pallet {
 
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::update_ip_storage())]
-        pub fn update_ip_storage(origin: OriginFor<T>, total_storage: Storage) -> DispatchResult {
+        pub fn update_ip_storage(
+            origin: OriginFor<T>,
+            total_storage: StorageSizeMB,
+        ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
 
@@ -343,7 +347,7 @@ pub mod pallet {
         pub fn submit_agreement_request(
             origin: OriginFor<T>,
             ip: AccountIdLookupOf<T>,
-            storage: Storage,
+            storage: StorageSizeMB,
             time_allocation: AgreementTimeAllocation,
             activation_block: BlockNumberFor<T>,
             payment_plan: PaymentPlan<T>,
