@@ -20,12 +20,11 @@ mod benchmarks {
     fn register_ip() {
         let total_storage: StorageSizeMB = 1000u64;
 
-        let account: T::AccountId = account("Alice", 0, 1);
         let caller = whitelisted_caller();
 
-        let balance: Balance = BalanceOf::<T>::from(1_000_000_000_000_000_000u128);
+        let balance: BalanceOf<T> = BalanceOf::<T>::from(1_000_000_000_u32);
 
-        T::Currency::mint_into(&caller, 1_000_000_000_000_000_000);
+        T::Currency::mint_into(&caller, balance);
 
         #[extrinsic_call]
         _(RawOrigin::Signed(caller), total_storage);

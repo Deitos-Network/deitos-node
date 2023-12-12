@@ -30,9 +30,9 @@ parameter_types! {
 type AccountId = u64;
 type AssetId = u32;
 
-pub const DEPOSIT_AMOUNT: u64 = 1_000_000_000u64;
-pub const COST_PER_UNIT: u64 = 1_000u64;
-pub const INITIAL_BALANCE: u64 = 1_000_000_000_000_u64;
+pub const DEPOSIT_AMOUNT: u64 = 1_000_000u64;
+pub const COST_PER_UNIT: u64 = 10u64;
+pub const INITIAL_BALANCE: u64 = 1_000_000_000u64;
 
 impl frame_system::Config for Test {
     type RuntimeEvent = RuntimeEvent;

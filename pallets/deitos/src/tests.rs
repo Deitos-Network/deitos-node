@@ -221,3 +221,33 @@ fn test_register_unregister_register_ip() {
         }));
     });
 }
+
+#[test]
+fn test_register_update_deposit_amount_unregister_ip() {
+    new_test_ext().execute_with(|| {
+        let ip = 1;
+        let updated_deposit_amount: BalanceOf<Test> = 2000_u64.into(); // Example updated amount
+
+        // Step 1: Register the IP
+        register_ip(); // This registers IP with account 1
+
+        // Verify registration and initial deposit amount
+        let initial_deposit = IPDepositAmount::<Test>::get().unwrap();
+        assert_eq!(initial_deposit, DEPOSIT_AMOUNT);
+
+        // Step 2: Update IPDepositAmount
+        IPDepositAmount::<Test>::put(updated_deposit_amount);
+
+        // Step 3: Unregister the IP
+        assert_ok!(Deitos::unregister_ip(RuntimeOrigin::signed(ip)));
+
+        // Verify that the original deposit amount is returned
+        let final_balance = <Balances as fungible::Inspect<_>>::balance(&ip);
+        assert_eq!(final_balance, INITIAL_BALANCE);
+
+        // Assert: Check for the correct event emissions
+        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPUnregistered {
+            ip,
+        }));
+    });
+}
