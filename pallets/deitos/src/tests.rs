@@ -2,8 +2,7 @@ use super::*;
 use crate::{mock::*, types::*, Error, Event};
 use frame_support::{assert_noop, assert_ok};
 
-fn register_ip() {
-    let total_storage: StorageSizeMB = 10000000_u32.into();
+fn register_ip(total_storage: StorageSizeMB) {
     assert_ok!(Deitos::register_ip(RuntimeOrigin::signed(1), total_storage));
 }
 
@@ -13,7 +12,7 @@ fn test_correct_ip_registration() {
         let total_storage: StorageSizeMB = 10000000_u32.into();
         let price_storage_per_block: BalanceOf<Test> = 1000_u64.into();
 
-        register_ip();
+        register_ip(total_storage);
 
         assert_eq!(
             <Balances as fungible::InspectHold<_>>::balance_on_hold(
@@ -50,8 +49,9 @@ fn test_correct_ip_registration() {
 fn test_fail_ip_registration_already_exists() {
     new_test_ext().execute_with(|| {
         let ip = 1;
+        let total_storage: StorageSizeMB = 10000000_u32.into();
         // Register the IP once
-        register_ip();
+        register_ip(total_storage);
 
         // Attempt to register the same IP again and expect failure
         let total_storage: StorageSizeMB = 10000000_u32.into();
@@ -91,7 +91,9 @@ fn test_update_storage_cost_per_unit() {
 #[test]
 fn test_update_ip_status() {
     new_test_ext().execute_with(|| {
-        register_ip();
+        let total_storage: StorageSizeMB = 10000000_u32.into();
+        // Register the IP once
+        register_ip(total_storage);
         // Arrange: Set up a registered IP and a status to update
         let ip = 1;
         let new_status = IPStatus::Active; // Replace with the correct enum value
@@ -122,7 +124,9 @@ fn test_unregister_ip() {
     new_test_ext().execute_with(|| {
         // Arrange: Register an IP first
         let ip = 1;
-        register_ip();
+        let total_storage: StorageSizeMB = 10000000_u32.into();
+        // Register the IP once
+        register_ip(total_storage);
 
         // Check initial balance on hold for IP
         let initial_hold_balance = <Balances as fungible::InspectHold<_>>::balance_on_hold(
@@ -154,10 +158,10 @@ fn test_unregister_ip() {
 #[test]
 fn test_update_ip_storage() {
     new_test_ext().execute_with(|| {
-        // Arrange: Register an IP and set initial storage
         let ip = 1;
         let initial_storage: StorageSizeMB = 10000000_u32.into();
-        Deitos::register_ip(RuntimeOrigin::signed(ip), initial_storage).unwrap();
+        // Register the IP once
+        register_ip(initial_storage);
 
         let new_storage: StorageSizeMB = 5000000_u32.into();
 
@@ -185,9 +189,9 @@ fn test_update_ip_storage() {
 fn test_register_unregister_register_ip() {
     new_test_ext().execute_with(|| {
         let ip = 1;
-
-        // Step 1: Register the IP
-        register_ip(); // Assuming this registers IP with account 1
+        let total_storage: StorageSizeMB = 10000000_u32.into();
+        // Register the IP once
+        register_ip(total_storage);
 
         // Verify registration
         let ip_details_initial = InfrastructureProvider::<Test>::get(ip).unwrap();
@@ -201,7 +205,7 @@ fn test_register_unregister_register_ip() {
         assert_eq!(ip_details_after_unreg.status, IPStatus::Unregistered);
 
         // Step 3: Register the IP again
-        register_ip(); // Re-register the same IP
+        register_ip(total_storage); // Re-register the same IP
 
         // Verify re-registration
         let ip_details_after_rereg = InfrastructureProvider::<Test>::get(ip).unwrap();
@@ -227,9 +231,9 @@ fn test_register_update_deposit_amount_unregister_ip() {
     new_test_ext().execute_with(|| {
         let ip = 1;
         let updated_deposit_amount: BalanceOf<Test> = 2000_u64.into(); // Example updated amount
-
-        // Step 1: Register the IP
-        register_ip(); // This registers IP with account 1
+        let total_storage: StorageSizeMB = 10000000_u32.into();
+        // Register the IP once
+        register_ip(total_storage);
 
         // Verify registration and initial deposit amount
         let initial_deposit = IPDepositAmount::<Test>::get().unwrap();
