@@ -118,5 +118,8 @@ fn testnet_genesis(
             // Assign network admin rights.
             "key": Some(root_key),
         },
+        "deitos": {
+            "initial_ip_deposit": 1_000_000_000_000_000u128,
+        }
     })
 }
