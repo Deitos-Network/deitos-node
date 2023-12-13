@@ -85,6 +85,7 @@ impl pallet_deitos::Config for Test {
     type AgreementId = u32;
     type MaxPaymentPlanDuration = ConstU32<500>;
     type MaxAgreements = ConstU32<500>;
+    type MaxAgreementsPerConsumer = ConstU32<500>;
     type PalletId = DeitosPalletId;
 }
 

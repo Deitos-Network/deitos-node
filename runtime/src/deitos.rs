@@ -15,6 +15,7 @@ impl pallet_deitos::Config for Runtime {
     type AgreementId = AgreementId;
     type MaxPaymentPlanDuration = ConstU32<500>;
     type MaxAgreements = ConstU32<500>;
+    type MaxAgreementsPerConsumer = ConstU32<500>;
     type PalletId = DeitosPalletId;
     type WeightInfo = pallet_deitos::weights::SubstrateWeight<Runtime>;
 }

@@ -14,6 +14,8 @@ pub type Installment<T> = BalanceOf<T>;
 pub type PaymentsDetails<T> = (Installment<T>, PaymentPlanPeriods);
 pub type PaymentPlan<T> = BoundedVec<PaymentsDetails<T>, <T as Config>::MaxPaymentPlanDuration>;
 pub type ActiveAgreements<T> = BoundedVec<<T as Config>::AgreementId, <T as Config>::MaxAgreements>;
+pub type AgreementsPerConsumer<T> =
+    BoundedVec<<T as Config>::AgreementId, <T as Config>::MaxAgreementsPerConsumer>;
 
 // TODO: Review the necessary status.
 #[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]

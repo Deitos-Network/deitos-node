@@ -90,6 +90,9 @@ pub mod pallet {
         type MaxAgreements: Get<u32>;
 
         #[pallet::constant]
+        type MaxAgreementsPerConsumer: Get<u32>;
+
+        #[pallet::constant]
         type PalletId: Get<PalletId>;
     }
 
@@ -135,13 +138,21 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn agreements)]
-    pub(super) type Agreements<T: Config> = StorageDoubleMap<
+    pub(super) type Agreements<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AgreementId,
+        AgreementDetails<T>,
+        ResultQuery<Error<T>::NonExistentStorageValue>,
+    >;
+
+    #[pallet::storage]
+    #[pallet::getter(fn consumer_agreement)]
+    pub(super) type ConsumerAgreements<T: Config> = StorageMap<
         _,
         Blake2_128Concat,
         T::AccountId, // Consumer
-        Blake2_128Concat,
-        T::AccountId, // Provider
-        AgreementDetails<T>,
+        AgreementsPerConsumer<T>,
         ResultQuery<Error<T>::NonExistentStorageValue>,
     >;
 
