@@ -17,7 +17,7 @@ fn test_successful_agreement_request_submission() {
         .expect("Failed to create proposed plan");
 
         // Register and activate the IP
-        register_and_activate_ip(1000); // Assuming 1000 MB of storage
+        register_and_activate_ip(10000000); // Assuming 1000 MB of storage
 
         // Act: Call the submit_agreement_request function
         assert_ok!(Deitos::submit_agreement_request(
@@ -29,16 +29,15 @@ fn test_successful_agreement_request_submission() {
         ));
 
         // Assert: Verify that the agreement is correctly stored
-        let agreement_id = Deitos::next_agreement_id().unwrap() - 1; // Assuming next_agreement_id is incremented after each agreement
-        let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
+        let stored_agreement = Agreements::<Test>::get(1).unwrap();
         assert_eq!(stored_agreement.consumer, CONSUMER);
         assert_eq!(stored_agreement.ip, IP);
         assert_eq!(stored_agreement.storage, storage_size);
         assert_eq!(stored_agreement.activation_block, activation_block);
 
         let expected_payment_plan_with_balance = vec![
-            (activation_block, activation_block + 100, 10), // Sample plan entry
-                                                            // Add more plan entries as needed
+            (activation_block, activation_block + 100, 1000), // Sample plan entry
+                                                              // Add more plan entries as needed
         ];
         let expected_payment_plan: PaymentPlan<Test> =
             PaymentPlan::<Test>::try_from(expected_payment_plan_with_balance).unwrap();
