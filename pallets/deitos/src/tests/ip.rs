@@ -1,10 +1,5 @@
 use super::*;
-use crate::{mock::*, types::*, Error, Event};
-use frame_support::{assert_noop, assert_ok};
-
-fn register_ip(total_storage: StorageSizeMB) {
-    assert_ok!(Deitos::register_ip(RuntimeOrigin::signed(1), total_storage));
-}
+use crate::{types::*, Error, Event};
 
 #[test]
 fn test_correct_ip_registration() {

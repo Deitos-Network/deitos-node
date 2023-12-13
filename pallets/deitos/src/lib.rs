@@ -7,7 +7,8 @@
 mod mock;
 
 pub use pallet::*;
-
+mod impls;
+pub use impls::*;
 #[cfg(test)]
 mod tests;
 
@@ -41,8 +42,8 @@ pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use sp_std::{convert::TryInto, prelude::*};
 
 use sp_runtime::{
-    traits::{One, Saturating, StaticLookup, Zero},
-    BoundedVec,
+    traits::{CheckedMul, One, Saturating, StaticLookup, Zero},
+    BoundedVec, SaturatedConversion,
 };
 pub use weights::*;
 
@@ -156,6 +157,10 @@ pub mod pallet {
         ResultQuery<Error<T>::NonExistentStorageValue>,
     >;
 
+    #[pallet::storage]
+    #[pallet::getter(fn last_id)]
+    pub type LastId<T: Config> = StorageValue<_, T::AgreementId, OptionQuery>;
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -178,6 +183,14 @@ pub mod pallet {
         StoragePriceUnitUpdated {
             price_storage_per_block: BalanceOf<T>,
         },
+        ConsumerRequestedAgreement {
+            ip: T::AccountId,
+            consumer: T::AccountId,
+            status: AgreementStatus,
+            storage: StorageSizeMB,
+            activation_block: BlockNumberFor<T>,
+            payment_plan: PaymentPlan<T>,
+        },
     }
 
     /// information.
@@ -193,6 +206,8 @@ pub mod pallet {
         OnGoingAgreements,
         /// IP already exists,
         IPAlreadyExists,
+        /// IP not active
+        IPNotActive,
     }
 
     #[pallet::call]
@@ -359,12 +374,67 @@ pub mod pallet {
             origin: OriginFor<T>,
             ip: AccountIdLookupOf<T>,
             storage: StorageSizeMB,
-            time_allocation: AgreementTimeAllocation,
             activation_block: BlockNumberFor<T>,
-            payment_plan: PaymentPlan<T>,
+            proposed_plan: ProposedPlan<T>,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let consumer = ensure_signed(origin)?;
+            let ip = T::Lookup::lookup(ip)?;
+            // Checks that the IP is either not registered or is registered but with Unregistered status
+            if let Some(ip_details) = InfrastructureProvider::<T>::get(&ip) {
+                ensure!(
+                    ip_details.status == IPStatus::Active,
+                    Error::<T>::IPNotActive
+                );
+                ensure!(
+                    ip_details
+                        .total_storage
+                        .saturating_sub(ip_details.reserved_storage)
+                        >= storage,
+                    Error::<T>::InsufficientStorage
+                );
+            }
+
+            let agreement_id = Self::next_agreement_id()?;
+
+            let cost_per_block = IPUnitCosts::<T>::get()?;
+            let price_storage_per_block = cost_per_block.price_storage_per_block;
+
+            let proposed_plan_with_balances: Vec<PaymentsDetails<T>> = proposed_plan
+                .iter()
+                .map(|(k, v)| {
+                    let blocks_amount = v.saturating_sub(*k).saturated_into::<u128>();
+                    let storage_price = price_storage_per_block.saturated_into::<u128>();
+
+                    let price = storage_price.saturating_mul(blocks_amount);
+                    let p: BalanceOf<T> = BalanceOf::<T>::saturated_from(price);
+
+                    (k.clone(), v.clone(), p)
+                })
+                .collect();
+
+            let payment_plan: PaymentPlan<T> =
+                PaymentPlan::<T>::try_from(proposed_plan_with_balances)
+                    .map_err(|_| Error::<T>::Overflow)?;
+
+            let agreement = AgreementDetails::<T> {
+                ip: ip.clone(),
+                consumer: consumer.clone(),
+                status: AgreementStatus::ConsumerRequest,
+                storage,
+                activation_block,
+                payment_plan: payment_plan.clone(),
+            };
+
+            Agreements::<T>::insert(&agreement_id, agreement);
+            Self::deposit_event(Event::ConsumerRequestedAgreement {
+                ip,
+                consumer,
+                status: AgreementStatus::ConsumerRequest,
+                storage,
+                activation_block,
+                payment_plan,
+            });
 
             Ok(())
         }
