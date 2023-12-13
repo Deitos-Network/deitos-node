@@ -74,7 +74,6 @@ pub struct IPDetails<T: pallet::Config> {
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
 pub struct AgreementDetails<T: pallet::Config> {
-    pub id: T::AgreementId,
     // Agreement Status
     pub status: AgreementStatus,
     // Total amount of storage in the agreement expressed in bytes?
