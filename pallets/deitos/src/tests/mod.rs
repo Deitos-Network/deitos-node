@@ -5,6 +5,7 @@ pub use frame_support::{
     assert_noop, assert_ok, parameter_types,
     traits::{ConstU32, ConstU64},
 };
+use sp_core::ConstU8;
 pub use sp_core::H256;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 pub use sp_runtime::{
@@ -93,6 +94,7 @@ impl pallet_deitos::Config for Test {
     type MaxPaymentPlanDuration = ConstU32<500>;
     type MaxAgreements = ConstU32<500>;
     type MaxAgreementsPerConsumer = ConstU32<500>;
+    type ConsumerDepositPercentage = ConstU8<10>;
     type PalletId = DeitosPalletId;
 }
 

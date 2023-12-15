@@ -30,5 +30,5 @@ mod benchmarks {
         _(RawOrigin::Signed(caller), total_storage);
     }
 
-    impl_benchmark_test_suite!(Deitos, crate::mock::new_test_ext(), crate::mock::Test);
+    impl_benchmark_test_suite!(Deitos, crate::tests::new_test_ext(), crate::tests::Test);
 }

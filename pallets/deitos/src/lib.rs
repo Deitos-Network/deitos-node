@@ -3,9 +3,6 @@
 #![allow(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #[warn(unused_imports)]
-#[cfg(test)]
-mod mock;
-
 pub use pallet::*;
 mod impls;
 pub use impls::*;
@@ -43,7 +40,7 @@ use sp_std::{convert::TryInto, prelude::*};
 
 use sp_runtime::{
     traits::{CheckedMul, One, Saturating, StaticLookup, Zero},
-    BoundedVec, SaturatedConversion,
+    BoundedVec, Percent, SaturatedConversion,
 };
 pub use weights::*;
 
@@ -88,6 +85,10 @@ pub mod pallet {
 
         /// Maximum Plan Duration
         #[pallet::constant]
+        type ConsumerDepositPercentage: Get<u8>;
+
+        /// Maximum Plan Duration
+        #[pallet::constant]
         type MaxAgreements: Get<u32>;
 
         #[pallet::constant]
@@ -102,6 +103,8 @@ pub mod pallet {
     pub enum HoldReason {
         #[codec(index = 0)]
         IPInitialDeposit,
+        #[codec(index = 1)]
+        ConsumerInitialDeposit,
     }
 
     #[pallet::genesis_config]
@@ -400,6 +403,8 @@ pub mod pallet {
             let cost_per_block = IPUnitCosts::<T>::get()?;
             let price_storage_per_block = cost_per_block.price_storage_per_block;
 
+            let mut total_cost = BalanceOf::<T>::zero();
+
             let proposed_plan_with_balances: Vec<PaymentsDetails<T>> = proposed_plan
                 .iter()
                 .map(|(k, v)| {
@@ -409,9 +414,14 @@ pub mod pallet {
                     let price = storage_price.saturating_mul(blocks_amount);
                     let p: BalanceOf<T> = BalanceOf::<T>::saturated_from(price);
 
+                    total_cost = total_cost.saturating_add(p);
+
                     (k.clone(), v.clone(), p)
                 })
                 .collect();
+
+            let percent = Percent::from_percent(T::ConsumerDepositPercentage::get());
+            let consumer_deposit = percent.mul_floor(total_cost);
 
             let payment_plan: PaymentPlan<T> =
                 PaymentPlan::<T>::try_from(proposed_plan_with_balances)
@@ -425,6 +435,12 @@ pub mod pallet {
                 activation_block,
                 payment_plan: payment_plan.clone(),
             };
+
+            T::Currency::hold(
+                &HoldReason::ConsumerInitialDeposit.into(),
+                &consumer,
+                consumer_deposit,
+            )?;
 
             Agreements::<T>::insert(&agreement_id, agreement);
             Self::deposit_event(Event::ConsumerRequestedAgreement {

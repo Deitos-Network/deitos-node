@@ -1,12 +1,13 @@
 use super::*;
 use frame_system::pallet_prelude::BlockNumberFor;
 
+const EXPECTED_CONSUMER_BALANCE_LOCKED: u64 = 100; // 10% OF 1000
+
 #[test]
 fn test_successful_agreement_request_submission() {
     new_test_ext().execute_with(|| {
         let storage_size: StorageSizeMB = 100; // Example storage size in MB
         let activation_block: BlockNumberFor<Test> = 100; // Example activation block number
-        let price_storage_per_block: BalanceOf<Test> = 10; // Example price per block
 
         // Mock proposed payment plan
         let proposed_plan: ProposedPlan<Test> = vec![
@@ -17,7 +18,7 @@ fn test_successful_agreement_request_submission() {
         .expect("Failed to create proposed plan");
 
         // Register and activate the IP
-        register_and_activate_ip(10000000); // Assuming 1000 MB of storage
+        register_and_activate_ip(10000000);
 
         // Act: Call the submit_agreement_request function
         assert_ok!(Deitos::submit_agreement_request(
@@ -41,6 +42,22 @@ fn test_successful_agreement_request_submission() {
         ];
         let expected_payment_plan: PaymentPlan<Test> =
             PaymentPlan::<Test>::try_from(expected_payment_plan_with_balance).unwrap();
+
+        // print consumer balance
+        let consumer_balance = Balances::free_balance(CONSUMER);
+
+        assert_eq!(
+            consumer_balance,
+            INITIAL_BALANCE - EXPECTED_CONSUMER_BALANCE_LOCKED
+        );
+
+        assert_eq!(
+            <Balances as fungible::InspectHold<_>>::balance_on_hold(
+                &HoldReason::ConsumerInitialDeposit.into(),
+                &CONSUMER
+            ),
+            EXPECTED_CONSUMER_BALANCE_LOCKED
+        );
 
         // Assert: Check for the correct event emission
         System::assert_has_event(RuntimeEvent::Deitos(
