@@ -1,40 +1,40 @@
-use super::*;
 use crate::{types::*, Error, Event};
+use frame_system::pallet_prelude::BlockNumberFor;
+
+use super::*;
 
 #[test]
 fn test_correct_ip_registration() {
     new_test_ext().execute_with(|| {
-        let total_storage: StorageSizeMB = 10000000_u32.into();
-        let price_storage_per_block: BalanceOf<Test> = 1000_u64.into();
+        let total_storage: StorageSizeMB = 10000000;
 
-        register_ip(total_storage);
+        register_ip(IP, total_storage);
 
         assert_eq!(
             <Balances as fungible::InspectHold<_>>::balance_on_hold(
                 &HoldReason::IPInitialDeposit.into(),
-                &1
+                &IP
             ),
-            DEPOSIT_AMOUNT
+            IP_INITIAL_DEPOSIT
         );
 
         assert_eq!(
-            <Balances as fungible::Inspect<_>>::balance(&1),
-            INITIAL_BALANCE - DEPOSIT_AMOUNT
+            <Balances as fungible::Inspect<_>>::balance(&IP),
+            INITIAL_BALANCE - IP_INITIAL_DEPOSIT
         );
 
         assert_eq!(
-            InfrastructureProvider::<Test>::get(1).unwrap(),
+            InfrastructureProviders::<Test>::get(IP).unwrap(),
             IPDetails::<Test> {
                 total_storage,
-                reserved_storage: Zero::zero(),
-                status: IPStatus::Validating,
-                active_agreements: BoundedVec::new(),
-                deposit_amount: DEPOSIT_AMOUNT,
+                status: IPStatus::Pending,
+                agreements: BoundedVec::new(),
+                deposit: IP_INITIAL_DEPOSIT,
             }
         );
 
-        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPRegistered {
-            ip: 1,
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPRegistered {
+            ip: IP,
             total_storage,
         }));
     });
@@ -43,15 +43,13 @@ fn test_correct_ip_registration() {
 #[test]
 fn test_fail_ip_registration_already_exists() {
     new_test_ext().execute_with(|| {
-        let ip = 1;
-        let total_storage: StorageSizeMB = 10000000_u32.into();
+        let total_storage: StorageSizeMB = 10000000;
         // Register the IP once
-        register_ip(total_storage);
+        register_ip(IP, total_storage);
 
         // Attempt to register the same IP again and expect failure
-        let total_storage: StorageSizeMB = 10000000_u32.into();
         assert_noop!(
-            Deitos::register_ip(RuntimeOrigin::signed(ip), total_storage),
+            Deitos::ip_register(RuntimeOrigin::signed(IP), total_storage),
             Error::<Test>::IPAlreadyExists
         );
     });
@@ -61,7 +59,7 @@ fn test_fail_ip_registration_already_exists() {
 fn test_update_storage_cost_per_unit() {
     new_test_ext().execute_with(|| {
         // Arrange
-        let new_price_per_block: BalanceOf<Test> = 2000_u64.into();
+        let new_price_per_block: BalanceOf<Test> = 2000;
 
         // Act
         assert_ok!(Deitos::update_storage_cost_per_unit(
@@ -71,46 +69,41 @@ fn test_update_storage_cost_per_unit() {
 
         // Assert
         assert_eq!(
-            IPUnitCosts::<Test>::get().unwrap().price_storage_per_block,
+            CurrentPrices::<Test>::get().storage_mb_per_block,
             new_price_per_block
         );
 
-        System::assert_has_event(RuntimeEvent::Deitos(
-            pallet_deitos::Event::StoragePriceUnitUpdated {
-                price_storage_per_block: new_price_per_block,
-            },
-        ));
+        System::assert_has_event(RuntimeEvent::Deitos(Event::StoragePriceUnitUpdated {
+            price_storage_per_block: new_price_per_block,
+        }));
     });
 }
 
 #[test]
 fn test_update_ip_status() {
     new_test_ext().execute_with(|| {
-        let total_storage: StorageSizeMB = 10000000_u32.into();
+        let total_storage: StorageSizeMB = 10000000;
         // Register the IP once
-        register_ip(total_storage);
+        register_ip(IP, total_storage);
         // Arrange: Set up a registered IP and a status to update
-        let ip = 1;
-        let new_status = IPStatus::Active; // Replace with the correct enum value
+        let new_status = IPStatus::Active;
 
         // Act: Update the IP status
         assert_ok!(Deitos::update_ip_status(
             RuntimeOrigin::root(),
-            ip.into(), // Using `into()` to convert to AccountIdLookupOf<T>
-            new_status.clone(),
+            IP.into(), // Using `into()` to convert to AccountIdLookupOf<T>
+            new_status,
         ));
 
         // Assert: Check if the IP status has been updated
-        let ip_details = InfrastructureProvider::<Test>::get(ip).unwrap();
+        let ip_details = InfrastructureProviders::<Test>::get(IP).unwrap();
         assert_eq!(ip_details.status, new_status);
 
         // Assert: Check for the correct event emission
-        System::assert_has_event(RuntimeEvent::Deitos(
-            pallet_deitos::Event::IPStatusChanged {
-                ip,
-                status: new_status,
-            },
-        ));
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPStatusChanged {
+            ip: IP,
+            status: new_status,
+        }));
     });
 }
 
@@ -118,105 +111,128 @@ fn test_update_ip_status() {
 fn test_unregister_ip() {
     new_test_ext().execute_with(|| {
         // Arrange: Register an IP first
-        let ip = 1;
-        let total_storage: StorageSizeMB = 10000000_u32.into();
+        let total_storage: StorageSizeMB = 10000000;
         // Register the IP once
-        register_ip(total_storage);
+        register_ip(IP, total_storage);
 
         // Check initial balance on hold for IP
         let initial_hold_balance = <Balances as fungible::InspectHold<_>>::balance_on_hold(
             &HoldReason::IPInitialDeposit.into(),
-            &ip,
+            &IP,
         );
-        assert_eq!(initial_hold_balance, DEPOSIT_AMOUNT);
+        assert_eq!(initial_hold_balance, IP_INITIAL_DEPOSIT);
 
         // Act: Unregister the IP
-        assert_ok!(Deitos::unregister_ip(RuntimeOrigin::signed(ip)));
+        assert_ok!(Deitos::ip_unregister(RuntimeOrigin::signed(IP)));
 
         // Assert: Check if the IP is marked as unregistered
-        let ip_details = InfrastructureProvider::<Test>::get(ip).unwrap();
+        let ip_details = InfrastructureProviders::<Test>::get(IP).unwrap();
         assert_eq!(ip_details.status, IPStatus::Unregistered);
 
         // Check balance after unregistering IP
-        let balance_after_unregister = <Balances as fungible::Inspect<_>>::balance(&ip);
+        let balance_after_unregister = <Balances as fungible::Inspect<_>>::balance(&IP);
         assert_eq!(balance_after_unregister, INITIAL_BALANCE); // Assuming that the balance should be reset to initial balance
 
         // Assert: Check for the correct event emission
-        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPUnregistered {
-            ip,
-        }));
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPUnregistered { ip: IP }));
     });
 }
 
-// TODO - Add a test for `update_ip_status` to fail if there are ongoing agreements
+#[test]
+fn test_fail_ip_unregister_agreement_in_progress() {
+    new_test_ext().execute_with(|| {
+        let storage: StorageSizeMB = 100;
+        let activation_block: BlockNumberFor<Test> = 100;
+        let payment_plan: PaymentPlan<Test> = vec![activation_block + 100].try_into().unwrap();
+
+        // Register and activate the IP
+        register_and_activate_ip(IP, storage);
+
+        // Request agreement
+        assert_ok!(Deitos::consumer_request_agreement(
+            RuntimeOrigin::signed(CONSUMER),
+            IP,
+            storage,
+            activation_block,
+            payment_plan.clone(),
+        ));
+
+        // Accept agreement
+        let expected_agreement_id = 1;
+        assert_ok!(Deitos::ip_accept_agreement(
+            RuntimeOrigin::signed(IP),
+            expected_agreement_id
+        ));
+
+        // Attempt to unregister the IP and expect failure
+        assert_noop!(
+            Deitos::ip_unregister(RuntimeOrigin::signed(IP)),
+            Error::<Test>::AgreementInProgress
+        );
+    });
+}
 
 #[test]
 fn test_update_ip_storage() {
     new_test_ext().execute_with(|| {
-        let ip = 1;
-        let initial_storage: StorageSizeMB = 10000000_u32.into();
+        let initial_storage: StorageSizeMB = 10000000;
         // Register the IP once
-        register_ip(initial_storage);
+        register_ip(IP, initial_storage);
 
-        let new_storage: StorageSizeMB = 5000000_u32.into();
+        let new_storage: StorageSizeMB = 5000000;
 
         // Act: Update the storage capacity for the IP
-        assert_ok!(Deitos::update_ip_storage(
-            RuntimeOrigin::signed(ip),
+        assert_ok!(Deitos::ip_update_storage(
+            RuntimeOrigin::signed(IP),
             new_storage
         ));
 
         // Assert: Verify the storage capacity has been updated
-        let ip_details = InfrastructureProvider::<Test>::get(ip).unwrap();
+        let ip_details = InfrastructureProviders::<Test>::get(IP).unwrap();
         assert_eq!(ip_details.total_storage, new_storage);
 
         // Assert: Check for the correct event emission
-        System::assert_has_event(RuntimeEvent::Deitos(
-            pallet_deitos::Event::IPStorageUpdated {
-                ip,
-                total_storage: new_storage,
-            },
-        ));
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPStorageUpdated {
+            ip: IP,
+            total_storage: new_storage,
+        }));
     });
 }
 
 #[test]
 fn test_register_unregister_register_ip() {
     new_test_ext().execute_with(|| {
-        let ip = 1;
-        let total_storage: StorageSizeMB = 10000000_u32.into();
+        let total_storage: StorageSizeMB = 10000000;
         // Register the IP once
-        register_ip(total_storage);
+        register_ip(IP, total_storage);
 
         // Verify registration
-        let ip_details_initial = InfrastructureProvider::<Test>::get(ip).unwrap();
-        assert_eq!(ip_details_initial.status, IPStatus::Validating);
+        let ip_details_initial = InfrastructureProviders::<Test>::get(IP).unwrap();
+        assert_eq!(ip_details_initial.status, IPStatus::Pending);
 
         // Step 2: Unregister the IP
-        assert_ok!(Deitos::unregister_ip(RuntimeOrigin::signed(ip)));
+        assert_ok!(Deitos::ip_unregister(RuntimeOrigin::signed(IP)));
 
         // Verify unregistration
-        let ip_details_after_unreg = InfrastructureProvider::<Test>::get(ip).unwrap();
+        let ip_details_after_unreg = InfrastructureProviders::<Test>::get(IP).unwrap();
         assert_eq!(ip_details_after_unreg.status, IPStatus::Unregistered);
 
         // Step 3: Register the IP again
-        register_ip(total_storage); // Re-register the same IP
+        register_ip(IP, total_storage); // Re-register the same IP
 
         // Verify re-registration
-        let ip_details_after_rereg = InfrastructureProvider::<Test>::get(ip).unwrap();
-        assert_eq!(ip_details_after_rereg.status, IPStatus::Validating);
+        let ip_details_after_rereg = InfrastructureProviders::<Test>::get(IP).unwrap();
+        assert_eq!(ip_details_after_rereg.status, IPStatus::Pending);
 
         // Assert: Check for the correct event emissions
-        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPRegistered {
-            ip,
-            total_storage: 10000000_u32.into(),
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPRegistered {
+            ip: IP,
+            total_storage: 10000000,
         }));
-        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPUnregistered {
-            ip,
-        }));
-        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPRegistered {
-            ip,
-            total_storage: 10000000_u32.into(),
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPUnregistered { ip: IP }));
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPRegistered {
+            ip: IP,
+            total_storage: 10000000,
         }));
     });
 }
@@ -224,29 +240,26 @@ fn test_register_unregister_register_ip() {
 #[test]
 fn test_register_update_deposit_amount_unregister_ip() {
     new_test_ext().execute_with(|| {
-        let ip = 1;
-        let updated_deposit_amount: BalanceOf<Test> = 2000_u64.into(); // Example updated amount
-        let total_storage: StorageSizeMB = 10000000_u32.into();
+        let updated_deposit_amount: BalanceOf<Test> = 2000; // Example updated amount
+        let total_storage: StorageSizeMB = 10000000;
         // Register the IP once
-        register_ip(total_storage);
+        register_ip(IP, total_storage);
 
         // Verify registration and initial deposit amount
-        let initial_deposit = IPDepositAmount::<Test>::get().unwrap();
-        assert_eq!(initial_deposit, DEPOSIT_AMOUNT);
+        let initial_deposit = IPDepositAmount::<Test>::get();
+        assert_eq!(initial_deposit, IP_INITIAL_DEPOSIT);
 
         // Step 2: Update IPDepositAmount
         IPDepositAmount::<Test>::put(updated_deposit_amount);
 
         // Step 3: Unregister the IP
-        assert_ok!(Deitos::unregister_ip(RuntimeOrigin::signed(ip)));
+        assert_ok!(Deitos::ip_unregister(RuntimeOrigin::signed(IP)));
 
         // Verify that the original deposit amount is returned
-        let final_balance = <Balances as fungible::Inspect<_>>::balance(&ip);
+        let final_balance = <Balances as fungible::Inspect<_>>::balance(&IP);
         assert_eq!(final_balance, INITIAL_BALANCE);
 
         // Assert: Check for the correct event emissions
-        System::assert_has_event(RuntimeEvent::Deitos(pallet_deitos::Event::IPUnregistered {
-            ip,
-        }));
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPUnregistered { ip: IP }));
     });
 }

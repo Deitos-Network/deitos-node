@@ -1,187 +1,245 @@
-use super::*;
 use frame_system::pallet_prelude::BlockNumberFor;
 
-const EXPECTED_CONSUMER_BALANCE_LOCKED: u64 = 100; // 10% OF 1000
+use super::*;
 
 #[test]
-fn test_successful_agreement_request_submission() {
+fn test_consumer_request_agreement() {
     new_test_ext().execute_with(|| {
-        let storage_size: StorageSizeMB = 100; // Example storage size in MB
-        let activation_block: BlockNumberFor<Test> = 100; // Example activation block number
-
-        // Mock proposed payment plan
-        let proposed_plan: ProposedPlan<Test> = vec![
-            (activation_block, activation_block + 100), // Sample plan entry
-                                                        // Add more plan entries as needed
-        ]
-        .try_into()
-        .expect("Failed to create proposed plan");
+        let storage: StorageSizeMB = 100;
+        let activation_block: BlockNumberFor<Test> = 100;
+        let payment_plan: PaymentPlan<Test> = vec![activation_block + 100, activation_block + 200]
+            .try_into()
+            .unwrap();
 
         // Register and activate the IP
-        register_and_activate_ip(10000000);
+        register_and_activate_ip(IP, storage);
 
-        // Act: Call the submit_agreement_request function
-        assert_ok!(Deitos::submit_agreement_request(
+        // Act: Request agreement
+        assert_ok!(Deitos::consumer_request_agreement(
             RuntimeOrigin::signed(CONSUMER),
             IP,
-            storage_size,
-            activation_block,
-            proposed_plan.clone(),
-        ));
-
-        // Assert: Verify that the agreement is correctly stored
-        let stored_agreement = Agreements::<Test>::get(1).unwrap();
-        assert_eq!(stored_agreement.consumer, CONSUMER);
-        assert_eq!(stored_agreement.ip, IP);
-        assert_eq!(stored_agreement.storage, storage_size);
-        assert_eq!(stored_agreement.activation_block, activation_block);
-
-        let expected_payment_plan_with_balance = vec![
-            (activation_block, activation_block + 100, 1000), // Sample plan entry
-                                                              // Add more plan entries as needed
-        ];
-        let expected_payment_plan: PaymentPlan<Test> =
-            PaymentPlan::<Test>::try_from(expected_payment_plan_with_balance).unwrap();
-
-        // print consumer balance
-        let consumer_balance = Balances::free_balance(CONSUMER);
-
-        assert_eq!(
-            consumer_balance,
-            INITIAL_BALANCE - EXPECTED_CONSUMER_BALANCE_LOCKED
-        );
-
-        assert_eq!(
-            <Balances as fungible::InspectHold<_>>::balance_on_hold(
-                &HoldReason::ConsumerInitialDeposit.into(),
-                &CONSUMER
-            ),
-            EXPECTED_CONSUMER_BALANCE_LOCKED
-        );
-
-        // Assert: Check for the correct event emission
-        System::assert_has_event(RuntimeEvent::Deitos(
-            pallet_deitos::Event::ConsumerRequestedAgreement {
-                ip: IP,
-                consumer: CONSUMER,
-                status: AgreementStatus::ConsumerRequest,
-                storage: storage_size,
-                activation_block,
-                payment_plan: expected_payment_plan, // or the expected payment plan after processing
-            },
-        ));
-    });
-}
-
-/*
-#[test]
-fn test_successful_agreement_request() {
-    new_test_ext().execute_with(|| {
-        let consumer_account_id = 2;
-        let ip_account_id = 1;
-        let requested_storage: StorageSizeMB = 1000;
-        let time_allocation: BlockNumberFor<Test> = 1000;
-        let activation_block: PaymentPlan<Test> =  PaymentPlan<Test>::from(100);
-        let payment_plan = PaymentPlan::Standard;
-
-        // Register and activate an IP with sufficient storage
-        let total_storage: StorageSizeMB = 10000000_u32.into();
-        register_ip(total_storage);
-        let ip_lookup = T::Lookup::unlookup(ip_account_id.clone());
-        assert_ok!(Deitos::register_ip(RuntimeOrigin::root(), ip_lookup, IPStatus::Active));
-
-        assert_ok!(Deitos::submit_agreement_request(
-            RuntimeOrigin::signed(consumer_account_id),
-            T::Lookup::unlookup(ip_account_id),
-            requested_storage,
-            time_allocation,
+            storage,
             activation_block,
             payment_plan.clone(),
         ));
 
-        // Verify that the agreement is correctly stored
-        let agreement_id = Deitos::next_agreement_id() - 1; // Assuming next_agreement_id() increments after each use
-        let stored_agreement =
-            Agreements::<Test>::get(agreement_id).expect("Agreement should be stored");
-
-        assert_eq!(stored_agreement.consumer, consumer_account_id);
-        assert_eq!(stored_agreement.ip, ip_account_id);
-        assert_eq!(stored_agreement.storage, requested_storage);
-        assert_eq!(stored_agreement.time_allocation, time_allocation);
+        // Assert: Verify that the agreement request is correctly stored
+        let expected_agreement_id = 1;
+        let stored_agreement = Agreements::<Test>::get(expected_agreement_id).unwrap();
+        let expected_consumer_deposit = 100 * PRICE_STORAGE; // Length of last installment * price per block
+        assert_eq!(stored_agreement.ip, IP);
+        assert_eq!(stored_agreement.consumer, CONSUMER);
+        assert_eq!(stored_agreement.consumer_deposit, expected_consumer_deposit);
+        assert_eq!(stored_agreement.status, AgreementStatus::ConsumerRequest);
+        assert_eq!(stored_agreement.storage, storage);
         assert_eq!(stored_agreement.activation_block, activation_block);
         assert_eq!(stored_agreement.payment_plan, payment_plan);
 
-        // Check for the correct event emission
-        assert_has_event!(RuntimeEvent::Deitos(
-            pallet_deitos::Event::ConsumerRequestedAgreement {
-                ip: ip_account_id,
-                consumer: consumer_account_id,
-                status: AgreementStatus::ConsumerRequest,
-                storage: requested_storage,
-                time_allocation,
-                activation_block,
-                payment_plan,
-            }
+        // Verify that the IP's data is correctly updated
+        let ip_details = InfrastructureProviders::<Test>::get(IP).unwrap();
+        assert_eq!(ip_details.agreements, vec![expected_agreement_id]);
+
+        // Verify that the consumer's data is correctly updated
+        let consumer_agreements = ConsumerAgreements::<Test>::get(CONSUMER);
+        assert_eq!(consumer_agreements, vec![expected_agreement_id]);
+
+        // Assert: Verify that the consumer's balance is properly updated
+        assert_eq!(
+            Balances::free_balance(CONSUMER),
+            INITIAL_BALANCE - expected_consumer_deposit
+        );
+
+        assert_eq!(
+            <Balances as fungible::InspectHold<_>>::balance_on_hold(
+                &HoldReason::ConsumerDeposit.into(),
+                &CONSUMER
+            ),
+            expected_consumer_deposit
+        );
+
+        // Assert: Check for the correct event emission
+        System::assert_has_event(RuntimeEvent::Deitos(Event::ConsumerRequestedAgreement {
+            agreement_id: expected_agreement_id,
+            ip: IP,
+            consumer: CONSUMER,
+            consumer_deposit: expected_consumer_deposit,
+            storage,
+            activation_block,
+            payment_plan,
+        }));
+    });
+}
+
+#[test]
+fn test_ip_accept_agreement() {
+    new_test_ext().execute_with(|| {
+        let storage: StorageSizeMB = 100;
+        let activation_block: BlockNumberFor<Test> = 100;
+        let payment_plan: PaymentPlan<Test> = vec![activation_block + 100].try_into().unwrap();
+
+        // Register and activate the IP
+        register_and_activate_ip(IP, storage);
+
+        // Request agreement
+        assert_ok!(Deitos::consumer_request_agreement(
+            RuntimeOrigin::signed(CONSUMER),
+            IP,
+            storage,
+            activation_block,
+            payment_plan.clone(),
         ));
+
+        // IP accepts agreement
+        let agreement_id = 1;
+        assert_ok!(Deitos::ip_accept_agreement(
+            RuntimeOrigin::signed(IP),
+            agreement_id,
+        ));
+
+        // Verify that the agreement status is correctly updated
+        let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
+        assert_eq!(stored_agreement.status, AgreementStatus::Agreed);
+
+        // Check for the correct event emission
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPAcceptedAgreement {
+            agreement_id,
+            ip: IP,
+            consumer: CONSUMER,
+        }));
     });
 }
 
 #[test]
-fn test_fail_agreement_request_inactive_ip() {
+fn test_consumer_accept_agreement() {
     new_test_ext().execute_with(|| {
-        let consumer_account_id = 1;
-        let ip_account_id = 2;
-        let requested_storage: StorageSizeMB = 1000;
-        let time_allocation = AgreementTimeAllocation::Monthly;
+        let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
-        let payment_plan = PaymentPlan::Standard;
+        let payment_plan: PaymentPlan<Test> = vec![activation_block + 300].try_into().unwrap();
 
-        // Register IP without activating it
-        let total_storage: StorageSizeMB = 10000000_u32.into();
-        register_ip(ip_account_id, total_storage);
+        // Register and activate the IP
+        register_and_activate_ip(IP, storage);
 
-        // Attempt to submit agreement request and expect failure due to inactive IP
-        assert_noop!(
-            Deitos::submit_agreement_request(
-                RuntimeOrigin::signed(consumer_account_id),
-                T::Lookup::unlookup(ip_account_id),
-                requested_storage,
-                time_allocation,
-                activation_block,
-                payment_plan,
-            ),
-            Error::<Test>::IPNotActive
+        // Consumer requests agreement with a payment plan of 1 installment (300 blocks)
+        assert_ok!(Deitos::consumer_request_agreement(
+            RuntimeOrigin::signed(CONSUMER),
+            IP,
+            storage,
+            activation_block,
+            payment_plan,
+        ));
+
+        // IP proposes payment plan of 2 installments (100, 200 blocks)
+        let agreement_id = 1;
+        let new_payment_plan: PaymentPlan<Test> =
+            vec![activation_block + 100, activation_block + 300]
+                .try_into()
+                .unwrap();
+        assert_ok!(Deitos::ip_propose_payment_plan(
+            RuntimeOrigin::signed(IP),
+            agreement_id,
+            new_payment_plan.clone(),
+        ));
+
+        // Consumer accepts the new payment plan
+        assert_ok!(Deitos::consumer_accept_agreement(
+            RuntimeOrigin::signed(CONSUMER),
+            agreement_id,
+        ));
+
+        // Verify that the agreement is correctly updated
+        let expected_consumer_deposit = 200 * PRICE_STORAGE; // Length of last installment * price per block
+        let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
+        assert_eq!(stored_agreement.consumer_deposit, expected_consumer_deposit);
+        assert_eq!(stored_agreement.status, AgreementStatus::Agreed);
+        assert_eq!(stored_agreement.payment_plan, new_payment_plan);
+
+        // Verify that the consumer's balance is properly updated
+        assert_eq!(
+            Balances::free_balance(CONSUMER),
+            INITIAL_BALANCE - expected_consumer_deposit
         );
+
+        assert_eq!(
+            <Balances as fungible::InspectHold<_>>::balance_on_hold(
+                &HoldReason::ConsumerDeposit.into(),
+                &CONSUMER
+            ),
+            expected_consumer_deposit
+        );
+
+        // Check for the correct event emission
+        System::assert_has_event(RuntimeEvent::Deitos(Event::ConsumerAcceptedAgreement {
+            agreement_id,
+            ip: IP,
+            consumer: CONSUMER,
+        }));
     });
 }
 
 #[test]
-fn test_fail_agreement_request_insufficient_storage() {
+fn consumer_reject_proposal() {
     new_test_ext().execute_with(|| {
-        let consumer_account_id = 1;
-        let ip_account_id = 2;
-        let requested_storage: StorageSizeMB = 20000; // Greater than total storage
-        let time_allocation = AgreementTimeAllocation::Monthly;
+        let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
-        let payment_plan = PaymentPlan::Standard;
+        let payment_plan: PaymentPlan<Test> = vec![activation_block + 300].try_into().unwrap();
 
-        // Register an active IP with limited storage
-        let total_storage: StorageSizeMB = 1000_u32.into();
-        register_ip(ip_account_id, total_storage);
-        make_ip_active(ip_account_id);
+        // Register and activate the IP
+        register_and_activate_ip(IP, storage);
 
-        // Attempt to submit agreement request and expect failure due to insufficient storage
-        assert_noop!(
-            Deitos::submit_agreement_request(
-                RuntimeOrigin::signed(consumer_account_id),
-                T::Lookup::unlookup(ip_account_id),
-                requested_storage,
-                time_allocation,
-                activation_block,
-                payment_plan,
+        // Consumer requests agreement with a payment plan of 1 installment (300 blocks)
+        assert_ok!(Deitos::consumer_request_agreement(
+            RuntimeOrigin::signed(CONSUMER),
+            IP,
+            storage,
+            activation_block,
+            payment_plan,
+        ));
+
+        // IP proposes payment plan of 2 installments (100, 200 blocks)
+        let agreement_id = 1;
+        let new_payment_plan: PaymentPlan<Test> =
+            vec![activation_block + 100, activation_block + 300]
+                .try_into()
+                .unwrap();
+        assert_ok!(Deitos::ip_propose_payment_plan(
+            RuntimeOrigin::signed(IP),
+            agreement_id,
+            new_payment_plan.clone(),
+        ));
+
+        // Consumer rejects the new payment plan
+        assert_ok!(Deitos::consumer_revoke_agreement(
+            RuntimeOrigin::signed(CONSUMER),
+            agreement_id,
+        ));
+
+        // Verify that the agreement is removed
+        assert_eq!(Agreements::<Test>::get(agreement_id), None);
+
+        // Verify that the IP's data is correctly updated
+        let ip_details = InfrastructureProviders::<Test>::get(IP).unwrap();
+        assert_eq!(ip_details.agreements, vec![]);
+
+        // Verify that the consumer's data is correctly updated
+        let consumer_agreements = ConsumerAgreements::<Test>::get(CONSUMER);
+        assert_eq!(consumer_agreements, vec![]);
+
+        // Verify that the consumer's balance is properly updated
+        assert_eq!(Balances::free_balance(CONSUMER), INITIAL_BALANCE);
+
+        assert_eq!(
+            <Balances as fungible::InspectHold<_>>::balance_on_hold(
+                &HoldReason::ConsumerDeposit.into(),
+                &CONSUMER
             ),
-            Error::<Test>::InsufficientStorage
+            0
         );
+
+        // Check for the correct event emission
+        System::assert_has_event(RuntimeEvent::Deitos(Event::ConsumerRevokedAgreement {
+            agreement_id,
+            ip: IP,
+            consumer: CONSUMER,
+        }));
     });
 }
- */

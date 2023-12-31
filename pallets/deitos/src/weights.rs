@@ -34,16 +34,16 @@ use core::marker::PhantomData;
 
 /// Weight functions needed for pallet_template.
 pub trait WeightInfo {
-	fn register_ip() -> Weight;
+	fn ip_register() -> Weight;
 	fn update_ip_status() -> Weight;
-	fn update_ip_storage() -> Weight;
-	fn unregister_ip() -> Weight;
+	fn ip_update_storage() -> Weight;
+	fn ip_unregister() -> Weight;
 	fn update_storage_cost_per_unit() -> Weight;
-	fn submit_agreement_request() -> Weight;
-	fn ip_agreement_reponse() -> Weight;
-	fn consumer_agreement_reponse() -> Weight;
-	fn consumer_cancels_agreement() -> Weight;
-	fn ip_cancels_agreement() -> Weight;
+	fn consumer_request_agreement() -> Weight;
+	fn consumer_revoke_agreement() -> Weight;
+	fn ip_accept_agreement() -> Weight;
+	fn ip_propose_payment_plan() -> Weight;
+	fn consumer_accept_agreement() -> Weight;
 	fn make_installment_payment() -> Weight;
 	fn withdraw_provider_funds() -> Weight;
 	fn submit_provider_feedback() -> Weight;	
@@ -56,7 +56,7 @@ pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn register_ip() -> Weight {
+	fn ip_register() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -74,7 +74,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn update_ip_storage() -> Weight {
+	fn ip_update_storage() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -83,7 +83,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 	
-	fn unregister_ip() -> Weight {
+	fn ip_unregister() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -101,7 +101,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn submit_agreement_request() -> Weight {
+	fn consumer_request_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -110,7 +110,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn ip_agreement_reponse() -> Weight {
+	fn consumer_revoke_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -119,7 +119,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn consumer_agreement_reponse() -> Weight {
+	fn ip_accept_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -128,7 +128,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn consumer_cancels_agreement() -> Weight {
+	fn ip_propose_payment_plan() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -137,7 +137,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn ip_cancels_agreement() -> Weight {
+	fn consumer_accept_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -187,7 +187,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 impl WeightInfo for () {
 	/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn register_ip() -> Weight {
+	fn ip_register() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -207,7 +207,7 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 
-	fn update_ip_storage() -> Weight {
+	fn ip_update_storage() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -217,7 +217,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn unregister_ip() -> Weight {
+	fn ip_unregister() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -239,7 +239,7 @@ impl WeightInfo for () {
 
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn submit_agreement_request() -> Weight {
+	fn consumer_request_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -249,7 +249,7 @@ impl WeightInfo for () {
 	}
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn ip_agreement_reponse() -> Weight {
+	fn consumer_revoke_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -259,7 +259,7 @@ impl WeightInfo for () {
 	}
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn consumer_agreement_reponse() -> Weight {
+	fn ip_accept_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -269,7 +269,7 @@ impl WeightInfo for () {
 	}
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn consumer_cancels_agreement() -> Weight {
+	fn ip_propose_payment_plan() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -279,7 +279,7 @@ impl WeightInfo for () {
 	}
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn ip_cancels_agreement() -> Weight {
+	fn consumer_accept_agreement() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

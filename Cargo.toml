@@ -113,4 +113,4 @@ futures = { version = "0.3", default-features = false }
 jsonrpsee = { version = "0.16", default-features = false }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0", default-features = false }
-log = { version = "0.4.17"}
+log = { version = "0.4.17" }
