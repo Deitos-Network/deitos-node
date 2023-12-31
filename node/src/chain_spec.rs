@@ -119,8 +119,8 @@ fn testnet_genesis(
             "key": Some(root_key),
         },
         "deitos": {
-            "initial_ip_deposit": 1_000_000_000_000_000u128,
-            "initial_price_storage_mb_per_block": 1_000u128,
+            "initialIpDeposit": 1_000_000_000_000_000u128,
+            "initialPriceStorageMbPerBlock": 1_000u128,
         }
     })
 }
