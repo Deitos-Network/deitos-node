@@ -9,12 +9,13 @@ parameter_types! {
 }
 
 impl pallet_deitos::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type RuntimeHoldReason = RuntimeHoldReason;
-    type RuntimeEvent = RuntimeEvent;
-    type AgreementId = AgreementId;
-    type MaxPaymentPlanDuration = ConstU32<500>;
-    type MaxAgreements = ConstU32<500>;
-    type PalletId = DeitosPalletId;
     type WeightInfo = pallet_deitos::weights::SubstrateWeight<Runtime>;
+    type AgreementId = AgreementId;
+    type PaymentPlanLimit = ConstU32<500>;
+    type IPAgreementsLimit = ConstU32<500>;
+    type ConsumerAgreementsLimit = ConstU32<500>;
+    type PalletId = DeitosPalletId;
 }

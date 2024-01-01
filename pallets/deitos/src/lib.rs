@@ -1,29 +1,18 @@
-// Deitos pallet
-// Documentation under development !!!
-#![allow(warnings)]
+//! # Deitos Pallet
+//!
+//! The Deitos pallet implements the Deitos protocol. It allows Infrastructure Providers (IPs) to
+//! register and manage their storage capacity and consumers to request storage capacity from IPs.
+//! The protocol is designed to be flexible and allow for different payment plans.
+
+#![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
-#[warn(unused_imports)]
-#[cfg(test)]
-mod mock;
 
-pub use pallet::*;
-
-#[cfg(test)]
-mod tests;
-
-mod types;
-pub use types::*;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-pub mod weights;
 use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
     traits::{
         tokens::{
             fungible::{
-                self,
                 hold::{
                     Balanced as BalancedHold, Mutate as FunHoldMutate,
                     Unbalanced as FunHoldUnbalanced,
@@ -38,18 +27,34 @@ use frame_support::{
 };
 pub use log;
 pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
-use sp_std::{convert::TryInto, prelude::*};
-
 use sp_runtime::{
     traits::{One, Saturating, StaticLookup, Zero},
-    BoundedVec,
+    BoundedVec, SaturatedConversion,
 };
+use sp_std::{convert::TryInto, prelude::*};
+
+#[warn(unused_imports)]
+pub use pallet::*;
+pub use types::*;
 pub use weights::*;
+
+mod impls;
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+mod types;
+
+#[allow(missing_docs)]
+pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use super::*;
     use frame_system::pallet_prelude::*;
+
+    use super::*;
+
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
@@ -71,7 +76,9 @@ pub mod pallet {
         /// A type representing the weights required by the dispatchables of this pallet.
         type WeightInfo: WeightInfo;
 
+        /// Agreement Id type
         type AgreementId: Member
+            + Default
             + Parameter
             + Copy
             + Clone
@@ -81,145 +88,245 @@ pub mod pallet {
             + One
             + Zero;
 
-        /// Maximum Plan Duration
+        /// Payment Plan Limit
         #[pallet::constant]
-        type MaxPaymentPlanDuration: Get<u32>;
+        type PaymentPlanLimit: Get<u32>;
 
-        /// Maximum Plan Duration
+        /// Agreements per IP Limit
         #[pallet::constant]
-        type MaxAgreements: Get<u32>;
+        type IPAgreementsLimit: Get<u32>;
 
+        /// Agreements per Consumer Limit
+        #[pallet::constant]
+        type ConsumerAgreementsLimit: Get<u32>;
+
+        /// Pallet ID
         #[pallet::constant]
         type PalletId: Get<PalletId>;
     }
 
-    /// A reason for the NIS pallet placing a hold on funds.
+    /// A reason for the Deitos pallet placing a hold on funds.
     #[pallet::composite_enum]
     pub enum HoldReason {
+        /// Initial deposit for IP registration
         #[codec(index = 0)]
         IPInitialDeposit,
+        /// Consumer deposit for agreement
+        #[codec(index = 1)]
+        ConsumerDeposit,
     }
 
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
-        /// Genesis Initial IP Deposit
+        /// The amount of initial deposit for IP registration
         pub initial_ip_deposit: BalanceOf<T>,
-        pub initial_ip_costs_per_unit: BalanceOf<T>,
+        /// The initial price for storage of 1 MB per block
+        pub initial_price_storage_mb_per_block: BalanceOf<T>,
     }
 
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            IPDepositAmount::<T>::put(&self.initial_ip_deposit);
-            IPUnitCosts::<T>::put(IPCostsPerUnit {
-                price_storage_per_block: self.initial_ip_costs_per_unit,
+            IPDepositAmount::<T>::put(self.initial_ip_deposit);
+            CurrentPrices::<T>::put(Prices {
+                storage_mb_per_block: self.initial_price_storage_mb_per_block,
             });
         }
     }
 
+    /// The amount of initial deposit for IP registration
     #[pallet::storage]
     #[pallet::getter(fn ip_deposit_amount)]
-    pub type IPDepositAmount<T: Config> =
-        StorageValue<_, BalanceOf<T>, ResultQuery<Error<T>::NonExistentStorageValue>>;
+    pub type IPDepositAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
+    /// Prices defined by the protocol
     #[pallet::storage]
     #[pallet::getter(fn ip_cost_per_unit)]
-    pub type IPUnitCosts<T: Config> =
-        StorageValue<_, IPCostsPerUnit<T>, ResultQuery<Error<T>::NonExistentStorageValue>>;
+    pub type CurrentPrices<T: Config> = StorageValue<_, Prices<T>, ValueQuery>;
 
+    /// IPs currently existing in the network
     #[pallet::storage]
     #[pallet::getter(fn get_ip)]
-    pub type InfrastructureProvider<T: Config> =
+    pub type InfrastructureProviders<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, IPDetails<T>>;
 
+    /// Agreements currently existing in the network
     #[pallet::storage]
-    #[pallet::getter(fn agreements)]
-    pub(super) type Agreements<T: Config> = StorageDoubleMap<
-        _,
-        Blake2_128Concat,
-        T::AccountId, // Consumer
-        Blake2_128Concat,
-        T::AccountId, // Provider
-        AgreementDetails<T>,
-        ResultQuery<Error<T>::NonExistentStorageValue>,
-    >;
+    #[pallet::getter(fn get_agreement)]
+    pub(super) type Agreements<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AgreementId, AgreementDetails<T>>;
+
+    /// Customers` agreements currently existing in the network. This is a mapping from the customer
+    /// to a vector of agreement ids.
+    #[pallet::storage]
+    #[pallet::getter(fn get_consumer_agreement)]
+    pub(super) type ConsumerAgreements<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, ConsumerAgreementsVec<T>, ValueQuery>;
+
+    /// Current agreement id. This is used to assign a unique id to each created agreement.
+    /// The id is incremented by one for each new agreement.
+    #[pallet::storage]
+    #[pallet::getter(fn current_agreement_id)]
+    pub type CurrentAgreementId<T: Config> = StorageValue<_, T::AgreementId, ValueQuery>;
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// A user has successfully set a new value.
+        /// An IP has been registered
         IPRegistered {
+            /// The IP that has been registered
             ip: T::AccountId,
+            /// The total storage of the IP
             total_storage: StorageSizeMB,
         },
+        /// An IP has updated its storage amount
         IPStorageUpdated {
+            /// The IP that has updated its storage amount
             ip: T::AccountId,
+            /// The new total storage of the IP
             total_storage: StorageSizeMB,
         },
+        /// An IP has updated its status
         IPStatusChanged {
+            /// The IP that has updated its status
             ip: T::AccountId,
+            /// The new status of the IP
             status: IPStatus,
         },
+        /// An IP has been unregistered
         IPUnregistered {
+            /// The IP that has been unregistered
             ip: T::AccountId,
         },
+        /// The price for storage per block has been updated
         StoragePriceUnitUpdated {
+            /// The new price for storage per block
             price_storage_per_block: BalanceOf<T>,
+        },
+        /// A consumer has requested an agreement
+        ConsumerRequestedAgreement {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP the agreement is with
+            ip: T::AccountId,
+            /// The consumer requesting the agreement
+            consumer: T::AccountId,
+            /// The deposit the consumer has payed to secure the agreement
+            consumer_deposit: BalanceOf<T>,
+            /// The amount of storage covered by the agreement
+            storage: StorageSizeMB,
+            /// The block number when the rental starts
+            activation_block: BlockNumberFor<T>,
+            /// The payment plan for the agreement
+            payment_plan: PaymentPlan<T>,
+        },
+        /// A consumer has revoked an agreement
+        ConsumerRevokedAgreement {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP the agreement is with
+            ip: T::AccountId,
+            /// The consumer revoking the agreement
+            consumer: T::AccountId,
+        },
+        /// An IP has accepted an agreement
+        IPAcceptedAgreement {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP accepting the agreement
+            ip: T::AccountId,
+            /// The consumer the agreement is with
+            consumer: T::AccountId,
+        },
+        /// An IP has proposed a new payment plan
+        IPProposedPaymentPlan {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP proposing the new payment plan
+            ip: T::AccountId,
+            /// The consumer the agreement is with
+            consumer: T::AccountId,
+            /// The new payment plan
+            payment_plan: PaymentPlan<T>,
+        },
+        /// A consumer has accepted an agreement
+        ConsumerAcceptedAgreement {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP the agreement is with
+            ip: T::AccountId,
+            /// The consumer accepting the agreement
+            consumer: T::AccountId,
         },
     }
 
-    /// information.
+    /// Errors.
     #[pallet::error]
     pub enum Error<T> {
-        /// The value retrieved was `None` as no value was previously set.
-        NonExistentStorageValue,
-        /// Math overflow
-        Overflow,
+        /// IP agreements limit reached
+        IPAgreementsLimit,
+        /// Consumer agreements limit reached
+        ConsumerAgreementsLimit,
         /// Insufficient storage
         InsufficientStorage,
-        /// On going agreements
-        OnGoingAgreements,
+        /// Payment plan invalid
+        PaymentPlanInvalid,
         /// IP already exists,
         IPAlreadyExists,
+        /// IP not found
+        IPNotFound,
+        /// IP not active
+        IPNotActive,
+        /// Agreement not found
+        AgreementNotFound,
+        /// Activation block invalid
+        AgreementOutdated,
+        /// On going agreement(s)
+        AgreementInProgress,
+        /// Agreement status invalid
+        AgreementStatusInvalid,
     }
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
+        /// Register an IP. The IP must not be registered already, or must have been unregistered.
+        /// The IP must pay a deposit to register. The deposit is returned when the IP unregisters.
+        /// The IP must also specify the total storage it has.
+        /// The IP is registered with status `Pending` and must be activated by the network operator.
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::register_ip())]
-        pub fn register_ip(origin: OriginFor<T>, total_storage: StorageSizeMB) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
+        #[pallet::weight(T::WeightInfo::ip_register())]
+        pub fn ip_register(origin: OriginFor<T>, total_storage: StorageSizeMB) -> DispatchResult {
             let ip = ensure_signed(origin)?;
 
             // Checks that the IP is either not registered or is registered but with Unregistered status
-            if let Some(ip_details) = InfrastructureProvider::<T>::get(&ip) {
+            if let Some(ip_details) = Self::get_ip(&ip) {
                 ensure!(
                     ip_details.status == IPStatus::Unregistered,
                     Error::<T>::IPAlreadyExists
                 );
             }
 
-            let deposit_amount = IPDepositAmount::<T>::get()?;
-
-            T::Currency::hold(&HoldReason::IPInitialDeposit.into(), &ip, deposit_amount)?;
+            T::Currency::hold(
+                &HoldReason::IPInitialDeposit.into(),
+                &ip,
+                Self::ip_deposit_amount(),
+            )?;
 
             let ip_details = IPDetails::<T> {
                 total_storage,
-                reserved_storage: Zero::zero(),
-                status: IPStatus::Validating,
-                active_agreements: BoundedVec::new(),
-                deposit_amount,
+                status: IPStatus::Pending,
+                agreements: BoundedVec::new(),
+                deposit: Self::ip_deposit_amount(),
             };
 
-            InfrastructureProvider::<T>::insert(&ip, ip_details);
-            Self::deposit_event(Event::IPRegistered { ip, total_storage });
+            InfrastructureProviders::<T>::insert(&ip, ip_details);
 
+            Self::deposit_event(Event::IPRegistered { ip, total_storage });
             Ok(())
         }
 
-        /// This is a temporary call to manage the IP status.
-        /// Statuses updates should be done automatically after an environment software check.
+        /// Update the status of an IP. Only the network operator can update the status of an IP.
         #[pallet::call_index(1)]
         #[pallet::weight(T::WeightInfo::update_ip_status())]
         pub fn update_ip_status(
@@ -228,81 +335,53 @@ pub mod pallet {
             status: IPStatus,
         ) -> DispatchResult {
             ensure_root(origin)?;
-            let provider = T::Lookup::lookup(ip)?;
+            let ip = T::Lookup::lookup(ip)?;
 
-            InfrastructureProvider::<T>::try_mutate(
-                &provider,
-                |ip_details| -> Result<_, DispatchError> {
-                    let ip_details = ip_details
-                        .as_mut()
-                        .ok_or(Error::<T>::NonExistentStorageValue)?;
+            InfrastructureProviders::<T>::try_mutate(&ip, |ip_details| {
+                ip_details
+                    .as_mut()
+                    .map(|x| x.status = status)
+                    .ok_or(Error::<T>::IPNotFound)
+            })?;
 
-                    ip_details.status = status.clone();
-
-                    Ok(())
-                },
-            )?;
-
-            Self::deposit_event(Event::IPStatusChanged {
-                ip: provider.clone(),
-                status,
-            });
-
-            Ok(())
+            Self::success_event(Event::IPStatusChanged { ip, status })
         }
 
+        /// Update the total storage of an IP.
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::update_ip_storage())]
-        pub fn update_ip_storage(
+        #[pallet::weight(T::WeightInfo::ip_update_storage())]
+        pub fn ip_update_storage(
             origin: OriginFor<T>,
             total_storage: StorageSizeMB,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
             let ip = ensure_signed(origin)?;
 
-            InfrastructureProvider::<T>::try_mutate(
-                &ip,
-                |ip_details| -> Result<_, DispatchError> {
-                    let ip_details = ip_details
-                        .as_mut()
-                        .ok_or(Error::<T>::NonExistentStorageValue)?;
+            InfrastructureProviders::<T>::try_mutate(&ip, |ip_details| {
+                ip_details
+                    .as_mut()
+                    .map(|x| x.total_storage = total_storage)
+                    .ok_or(Error::<T>::IPNotFound)
+            })?;
 
-                    // Check if the new total_storage is enough to cover the current reserved_storage
-                    ensure!(
-                        total_storage >= ip_details.reserved_storage,
-                        Error::<T>::InsufficientStorage
-                    );
-
-                    ip_details.total_storage = total_storage;
-
-                    Ok(())
-                },
-            )?;
-
-            Self::deposit_event(Event::IPStorageUpdated {
-                ip: ip.clone(),
-                total_storage,
-            });
-
-            Ok(())
+            Self::success_event(Event::IPStorageUpdated { ip, total_storage })
         }
 
+        /// Unregister an IP. The IP must be registered and must not have any agreements in progress.
+        /// The IP gets back the deposit it payed during registration.
         #[pallet::call_index(3)]
-        #[pallet::weight(T::WeightInfo::unregister_ip())]
-        pub fn unregister_ip(origin: OriginFor<T>) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
+        #[pallet::weight(T::WeightInfo::ip_unregister())]
+        pub fn ip_unregister(origin: OriginFor<T>) -> DispatchResult {
             let ip = ensure_signed(origin)?;
 
-            InfrastructureProvider::<T>::try_mutate(
+            InfrastructureProviders::<T>::try_mutate(
                 &ip,
                 |ip_details| -> Result<_, DispatchError> {
-                    let ip_details = ip_details
-                        .as_mut()
-                        .ok_or(Error::<T>::NonExistentStorageValue)?;
+                    let ip_details = ip_details.as_mut().ok_or(Error::<T>::IPNotFound)?;
 
+                    // TODO: Agreements at negotiation stage should not prevent the IP from unregistering.
                     ensure!(
-                        ip_details.active_agreements.len() == 0,
-                        Error::<T>::OnGoingAgreements
+                        ip_details.agreements.len() == 0,
+                        Error::<T>::AgreementInProgress
                     );
 
                     ip_details.status = IPStatus::Unregistered;
@@ -310,7 +389,7 @@ pub mod pallet {
                     T::Currency::release(
                         &HoldReason::IPInitialDeposit.into(),
                         &ip,
-                        ip_details.deposit_amount,
+                        ip_details.deposit,
                         Exact,
                     )?;
 
@@ -318,156 +397,324 @@ pub mod pallet {
                 },
             )?;
 
-            Self::deposit_event(Event::IPUnregistered { ip: ip.clone() });
-            Ok(())
+            Self::success_event(Event::IPUnregistered { ip })
         }
 
+        /// Update the price for storage per block. Only the network operator can update the price.
+        /// This change doesn't affect installments that have already been paid.
         #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::update_storage_cost_per_unit())]
         pub fn update_storage_cost_per_unit(
             origin: OriginFor<T>,
             price_storage_per_block: BalanceOf<T>,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
             ensure_root(origin)?;
 
-            IPUnitCosts::<T>::put(IPCostsPerUnit {
-                price_storage_per_block: price_storage_per_block.clone(),
+            CurrentPrices::<T>::put(Prices {
+                storage_mb_per_block: price_storage_per_block,
             });
 
-            Self::deposit_event(Event::StoragePriceUnitUpdated {
+            Self::success_event(Event::StoragePriceUnitUpdated {
                 price_storage_per_block,
-            });
-
-            Ok(())
+            })
         }
 
+        /// Request an agreement with an IP. The IP must be registered and active. The consumer must
+        /// pay a deposit to secure the agreement. The deposit is returned if the consumer revokes
+        /// the agreement, or is used to pay for the last installment. The consumer must specify the
+        /// amount of storage it needs, the block number when the rental starts and the payment plan.
+        ///
+        /// The payment plan must is a vector of block numbers. Every element represents the
+        /// end of an installment. The first installment starts at the activation block. The last element
+        /// is the end of the rental. The payment plan must be strictly increasing and contain at least 1 element.
         #[pallet::call_index(5)]
-        #[pallet::weight(T::WeightInfo::unregister_ip())]
-        pub fn submit_agreement_request(
+        #[pallet::weight(T::WeightInfo::consumer_request_agreement())]
+        #[frame_support::transactional]
+        pub fn consumer_request_agreement(
             origin: OriginFor<T>,
             ip: AccountIdLookupOf<T>,
             storage: StorageSizeMB,
-            time_allocation: AgreementTimeAllocation,
             activation_block: BlockNumberFor<T>,
             payment_plan: PaymentPlan<T>,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let consumer = ensure_signed(origin)?;
+            // Activation block must be in the future
+            ensure!(
+                activation_block > Self::current_block_number(),
+                Error::<T>::AgreementOutdated
+            );
 
-            Ok(())
+            // Payment plan must be valid
+            ensure!(
+                Self::is_valid_payment_plan(&payment_plan, activation_block),
+                Error::<T>::PaymentPlanInvalid
+            );
+
+            let ip = T::Lookup::lookup(ip)?;
+            let ip_details =
+                InfrastructureProviders::<T>::get(&ip).ok_or(Error::<T>::IPNotFound)?;
+
+            // IP is active
+            ensure!(
+                ip_details.status == IPStatus::Active,
+                Error::<T>::IPNotActive
+            );
+
+            // IP has enough storage
+            ensure!(
+                storage > Zero::zero() && storage <= ip_details.total_storage,
+                Error::<T>::InsufficientStorage
+            );
+
+            let mut agreement = AgreementDetails::new_consumer_request(
+                ip.clone(),
+                consumer.clone(),
+                storage,
+                activation_block,
+                payment_plan.clone(),
+            );
+
+            let consumer_deposit = agreement.hold_consumer_deposit()?;
+
+            let agreement_id = Self::insert_agreement(agreement)?;
+
+            Self::success_event(Event::ConsumerRequestedAgreement {
+                agreement_id,
+                ip,
+                consumer,
+                consumer_deposit,
+                storage,
+                activation_block,
+                payment_plan,
+            })
         }
 
+        /// Revoke an agreement. The agreement must be in progress. The consumer gets back the deposit
+        /// it payed to secure the agreement. Only the consumer can revoke the agreement. The agreement
+        /// can be revoked only if it is not accepted yet.
         #[pallet::call_index(6)]
-        #[pallet::weight(T::WeightInfo::ip_agreement_reponse())]
-        pub fn ip_agreement_reponse(
+        #[pallet::weight(T::WeightInfo::consumer_revoke_agreement())]
+        pub fn consumer_revoke_agreement(
             origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
-            payment_plan: Option<PaymentPlan<T>>,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let consumer = ensure_signed(origin)?;
 
-            // Accepts the agreement and payment plan
-            // Accepts the agreement and propose a payment plan with modifications
-            // Rejects the agreement and payment plan
+            let mut agreement =
+                Self::get_agreement(agreement_id).ok_or(Error::<T>::AgreementNotFound)?;
 
-            Ok(())
+            // Check that the transaction was signed by the consumer
+            ensure!(
+                agreement.consumer == consumer,
+                Error::<T>::AgreementNotFound
+            );
+
+            // Check that the agreement is not in progress
+            ensure!(
+                agreement.status == AgreementStatus::ConsumerRequest
+                    || agreement.status == AgreementStatus::IPProposedPaymentPlan,
+                Error::<T>::AgreementInProgress
+            );
+
+            agreement.release_consumer_deposit()?;
+
+            Self::delete_agreement(agreement_id)?;
+
+            Self::success_event(Event::ConsumerRevokedAgreement {
+                agreement_id,
+                ip: agreement.ip,
+                consumer,
+            })
         }
 
+        /// Accept an agreement by the IP that the agreement is with. The activation block must not be
+        /// in the past. The status of the agreement must be `ConsumerRequest`. The agreement is
+        /// accepted by the IP and the status changes to `Agreed`.
         #[pallet::call_index(7)]
-        #[pallet::weight(T::WeightInfo::consumer_agreement_reponse())]
-        pub fn consumer_agreement_reponse(
+        #[pallet::weight(T::WeightInfo::ip_accept_agreement())]
+        pub fn ip_accept_agreement(
             origin: OriginFor<T>,
-            ip: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
 
-            // Accepts the agreement if IP accepts everything without modifications
-            // Accepts the payment plan with modifications
-            // Rejects the plan with modifications
+            let consumer = Agreements::<T>::try_mutate(
+                agreement_id,
+                |agreement| -> Result<_, DispatchError> {
+                    let agreement = agreement.as_mut().ok_or(Error::<T>::AgreementNotFound)?;
 
-            Ok(())
+                    // Check that the transaction was signed by the IP
+                    ensure!(agreement.ip == ip, Error::<T>::AgreementNotFound);
+
+                    // Check that the agreement is requested by the consumer
+                    ensure!(
+                        agreement.status == AgreementStatus::ConsumerRequest,
+                        Error::<T>::AgreementStatusInvalid
+                    );
+
+                    // Activation block must not be in the past. Otherwise an IP can accept an old agreement
+                    // and penalize the consumer for not paying.
+                    ensure!(
+                        agreement.activation_block >= Self::current_block_number(),
+                        Error::<T>::AgreementOutdated
+                    );
+
+                    agreement.status = AgreementStatus::Agreed;
+                    Ok(agreement.consumer.clone())
+                },
+            )?;
+
+            Self::success_event(Event::IPAcceptedAgreement {
+                agreement_id,
+                ip,
+                consumer,
+            })
         }
 
+        /// Propose a new payment plan for an agreement. The agreement status must be `ConsumerRequest`.
         #[pallet::call_index(8)]
-        #[pallet::weight(T::WeightInfo::consumer_cancels_agreement())]
-        pub fn consumer_cancels_agreement(
+        #[pallet::weight(T::WeightInfo::ip_propose_payment_plan())]
+        pub fn ip_propose_payment_plan(
             origin: OriginFor<T>,
-            ip: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
+            payment_plan: PaymentPlan<T>,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
 
-            Ok(())
+            let consumer = Agreements::<T>::try_mutate(
+                agreement_id,
+                |agreement| -> Result<_, DispatchError> {
+                    let agreement = agreement.as_mut().ok_or(Error::<T>::AgreementNotFound)?;
+
+                    // Check that the transaction was signed by the IP
+                    ensure!(agreement.ip == ip, Error::<T>::AgreementNotFound);
+
+                    // Check that the agreement is requested by the consumer
+                    ensure!(
+                        agreement.status == AgreementStatus::ConsumerRequest,
+                        Error::<T>::AgreementStatusInvalid
+                    );
+
+                    // Payment plan must be valid
+                    ensure!(
+                        Self::is_valid_payment_plan(&payment_plan, agreement.activation_block),
+                        Error::<T>::PaymentPlanInvalid
+                    );
+
+                    agreement.status = AgreementStatus::IPProposedPaymentPlan;
+                    agreement.payment_plan = payment_plan.clone();
+
+                    Ok(agreement.consumer.clone())
+                },
+            )?;
+
+            Self::success_event(Event::IPProposedPaymentPlan {
+                agreement_id,
+                ip,
+                consumer,
+                payment_plan,
+            })
         }
 
+        /// Accept a payment plan proposed by an IP. The agreement status must be `IPProposedPaymentPlan`.
+        /// The consumer deposit is adjusted to the new payment plan. The agreement status changes to `Agreed`.
         #[pallet::call_index(9)]
-        #[pallet::weight(T::WeightInfo::ip_cancels_agreement())]
-        pub fn ip_cancels_agreement(
+        #[pallet::weight(T::WeightInfo::consumer_accept_agreement())]
+        pub fn consumer_accept_agreement(
             origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
             agreement_id: T::AgreementId,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let consumer = ensure_signed(origin)?;
 
-            Ok(())
+            let ip = Agreements::<T>::try_mutate(
+                agreement_id,
+                |agreement| -> Result<_, DispatchError> {
+                    let agreement = agreement.as_mut().ok_or(Error::<T>::AgreementNotFound)?;
+
+                    // Check that the transaction was signed by the consumer
+                    ensure!(
+                        agreement.consumer == consumer,
+                        Error::<T>::AgreementNotFound
+                    );
+
+                    // Check that IP has proposed a payment plan
+                    ensure!(
+                        agreement.status == AgreementStatus::IPProposedPaymentPlan,
+                        Error::<T>::AgreementStatusInvalid
+                    );
+
+                    agreement.adjust_consumer_deposit()?;
+                    agreement.status = AgreementStatus::Agreed;
+                    Ok(agreement.ip.clone())
+                },
+            )?;
+
+            Self::success_event(Event::ConsumerAcceptedAgreement {
+                agreement_id,
+                ip,
+                consumer,
+            })
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
             origin: OriginFor<T>,
-            ip: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _ip: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
         pub fn withdraw_provider_funds(
             origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _consumer: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(12)]
         #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
         pub fn submit_provider_feedback(
             origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _consumer: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
 
+        /// UNDER CONSTRUCTION
+        #[pallet::call_index(13)]
         #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
         pub fn submit_consumer_feedback(
             origin: OriginFor<T>,
-            ip: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _ip: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
     }
+}
+
+// TODO: Move this to a utils module
+fn is_strictly_increasing<T: PartialOrd>(slice: &[T]) -> bool {
+    slice.windows(2).all(|window| window[0] < window[1])
 }

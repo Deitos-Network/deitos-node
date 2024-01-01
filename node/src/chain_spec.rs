@@ -120,6 +120,7 @@ fn testnet_genesis(
         },
         "deitos": {
             "initialIpDeposit": 1_000_000_000_000_000u128,
+            "initialPriceStorageMbPerBlock": 1_000u128,
         }
     })
 }

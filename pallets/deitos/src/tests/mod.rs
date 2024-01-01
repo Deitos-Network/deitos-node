@@ -1,8 +1,7 @@
-use super::*;
-pub use crate as pallet_deitos;
 use frame_support::{
-    parameter_types,
+    assert_ok, parameter_types,
     traits::{ConstU32, ConstU64},
+    PalletId,
 };
 use sp_core::H256;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
@@ -10,6 +9,12 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
+
+use crate as pallet_deitos;
+use crate::{IPStatus, StorageSizeMB};
+
+mod agreements;
+mod ip;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -28,11 +33,13 @@ parameter_types! {
 }
 
 type AccountId = u64;
-type AssetId = u32;
+type Balance = u64;
 
-pub const DEPOSIT_AMOUNT: u64 = 1_000_000u64;
-pub const COST_PER_UNIT: u64 = 10u64;
-pub const INITIAL_BALANCE: u64 = 1_000_000_000u64;
+pub const IP_INITIAL_DEPOSIT: Balance = 1_000_000;
+pub const PRICE_STORAGE: Balance = 10;
+pub const INITIAL_BALANCE: Balance = 1_000_000_000;
+pub const IP: AccountId = 1;
+pub const CONSUMER: AccountId = 2;
 
 impl frame_system::Config for Test {
     type RuntimeEvent = RuntimeEvent;
@@ -83,8 +90,9 @@ impl pallet_deitos::Config for Test {
     type RuntimeHoldReason = RuntimeHoldReason;
     type WeightInfo = ();
     type AgreementId = u32;
-    type MaxPaymentPlanDuration = ConstU32<500>;
-    type MaxAgreements = ConstU32<500>;
+    type PaymentPlanLimit = ConstU32<500>;
+    type IPAgreementsLimit = ConstU32<500>;
+    type ConsumerAgreementsLimit = ConstU32<500>;
     type PalletId = DeitosPalletId;
 }
 
@@ -106,8 +114,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .unwrap();
 
     pallet_deitos::GenesisConfig::<Test> {
-        initial_ip_deposit: DEPOSIT_AMOUNT,
-        initial_ip_costs_per_unit: COST_PER_UNIT,
+        initial_ip_deposit: IP_INITIAL_DEPOSIT,
+        initial_price_storage_mb_per_block: PRICE_STORAGE,
     }
     .assimilate_storage(&mut t)
     .unwrap();
@@ -118,8 +126,27 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext
 }
 
+#[allow(dead_code)]
 pub fn run_to_block(n: u64) {
+    // TODO: Might need to trigger hooks too
     while System::block_number() < n {
         System::set_block_number(System::block_number() + 1);
     }
+}
+
+pub fn register_ip(ip: AccountId, total_storage: StorageSizeMB) {
+    assert_ok!(Deitos::ip_register(
+        RuntimeOrigin::signed(ip),
+        total_storage
+    ));
+}
+
+fn register_and_activate_ip(ip: AccountId, total_storage: StorageSizeMB) {
+    register_ip(ip, total_storage);
+
+    assert_ok!(Deitos::update_ip_status(
+        RuntimeOrigin::root(),
+        ip,
+        IPStatus::Active
+    ));
 }
