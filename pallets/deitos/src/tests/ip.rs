@@ -96,7 +96,7 @@ fn test_update_ip_status() {
         // Act: Update the IP status
         assert_ok!(Deitos::update_ip_status(
             RuntimeOrigin::root(),
-            IP.into(), // Using `into()` to convert to AccountIdLookupOf<T>
+            IP,
             new_status,
         ));
 

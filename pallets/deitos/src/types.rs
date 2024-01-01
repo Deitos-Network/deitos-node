@@ -1,5 +1,7 @@
 #![allow(unused_qualifications)]
 
+use core::cmp::Ordering;
+
 use frame_system::pallet_prelude::BlockNumberFor;
 use scale_info::TypeInfo;
 
@@ -133,20 +135,21 @@ impl<T: pallet::Config> AgreementDetails<T> {
         let new_deposit =
             Self::calculate_consumer_deposit(self.activation_block, &self.payment_plan);
 
-        if current_deposit < new_deposit {
-            T::Currency::hold(
+        match current_deposit.cmp(&new_deposit) {
+            Ordering::Less => T::Currency::hold(
                 &HoldReason::ConsumerDeposit.into(),
                 &self.consumer,
                 new_deposit - current_deposit,
-            )?;
-        } else if current_deposit > new_deposit {
-            T::Currency::release(
+            ),
+            Ordering::Greater => T::Currency::release(
                 &HoldReason::ConsumerDeposit.into(),
                 &self.consumer,
                 current_deposit - new_deposit,
                 Exact,
-            )?;
-        }
+            )
+            .map(|_| ()),
+            Ordering::Equal => Ok(()),
+        }?;
 
         self.consumer_deposit = new_deposit;
         Ok(new_deposit)

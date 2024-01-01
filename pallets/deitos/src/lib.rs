@@ -115,7 +115,7 @@ pub mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            IPDepositAmount::<T>::put(&self.initial_ip_deposit);
+            IPDepositAmount::<T>::put(self.initial_ip_deposit);
             CurrentPrices::<T>::put(Prices {
                 storage_mb_per_block: self.initial_price_storage_mb_per_block,
             });
@@ -346,7 +346,7 @@ pub mod pallet {
             ensure_root(origin)?;
 
             CurrentPrices::<T>::put(Prices {
-                storage_mb_per_block: price_storage_per_block.clone(),
+                storage_mb_per_block: price_storage_per_block,
             });
 
             Self::success_event(Event::StoragePriceUnitUpdated {
