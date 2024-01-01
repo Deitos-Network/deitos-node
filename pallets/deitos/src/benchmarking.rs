@@ -3,6 +3,8 @@
 // TODO: Implement benchmarks for the pallet.
 
 #![cfg(feature = "runtime-benchmarks")]
+// TODO: Remove this
+#![allow(warnings)]
 
 use frame_benchmarking::v2::*;
 use frame_support::{pallet_prelude::*, traits::tokens::fungible::Mutate};

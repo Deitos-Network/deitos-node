@@ -1,19 +1,17 @@
-pub use frame_support::{
-    assert_noop, assert_ok, parameter_types,
+use frame_support::{
+    assert_ok, parameter_types,
     traits::{ConstU32, ConstU64},
+    PalletId,
 };
-pub use sp_core::H256;
+use sp_core::H256;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
-pub use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, StaticLookup},
+use sp_runtime::{
+    traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
 
-pub use types::*;
-
-pub use crate as pallet_deitos;
-
-use super::*;
+use crate as pallet_deitos;
+use crate::{IPStatus, StorageSizeMB};
 
 mod agreements;
 mod ip;
@@ -128,7 +126,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext
 }
 
+#[allow(dead_code)]
 pub fn run_to_block(n: u64) {
+    // TODO: Might need to trigger hooks too
     while System::block_number() < n {
         System::set_block_number(System::block_number() + 1);
     }

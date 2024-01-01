@@ -1,4 +1,10 @@
+use frame_support::traits::fungible;
 use frame_system::pallet_prelude::BlockNumberFor;
+
+use crate::{
+    pallet::{Agreements, ConsumerAgreements, Event, HoldReason, InfrastructureProviders},
+    types::*,
+};
 
 use super::*;
 
