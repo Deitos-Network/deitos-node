@@ -1,5 +1,10 @@
-// Deitos pallet
-// TODO: Add documentation
+//! # Deitos Pallet
+//!
+//! The Deitos pallet implements the Deitos protocol. It allows Infrastructure Providers (IPs) to
+//! register and manage their storage capacity and consumers to request storage capacity from IPs.
+//! The protocol is designed to be flexible and allow for different payment plans.
+
+#![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
@@ -40,6 +45,8 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 mod types;
+
+#[allow(missing_docs)]
 pub mod weights;
 
 #[frame_support::pallet]
@@ -69,6 +76,7 @@ pub mod pallet {
         /// A type representing the weights required by the dispatchables of this pallet.
         type WeightInfo: WeightInfo;
 
+        /// Agreement Id type
         type AgreementId: Member
             + Default
             + Parameter
@@ -80,26 +88,30 @@ pub mod pallet {
             + One
             + Zero;
 
-        /// Maximum Payment Plan Limit
+        /// Payment Plan Limit
         #[pallet::constant]
         type PaymentPlanLimit: Get<u32>;
 
-        /// Maximum Agreements
+        /// Agreements per IP Limit
         #[pallet::constant]
         type IPAgreementsLimit: Get<u32>;
 
+        /// Agreements per Consumer Limit
         #[pallet::constant]
         type ConsumerAgreementsLimit: Get<u32>;
 
+        /// Pallet ID
         #[pallet::constant]
         type PalletId: Get<PalletId>;
     }
 
-    /// A reason for the NIS pallet placing a hold on funds.
+    /// A reason for the Deitos pallet placing a hold on funds.
     #[pallet::composite_enum]
     pub enum HoldReason {
+        /// Initial deposit for IP registration
         #[codec(index = 0)]
         IPInitialDeposit,
+        /// Consumer deposit for agreement
         #[codec(index = 1)]
         ConsumerDeposit,
     }
@@ -107,8 +119,9 @@ pub mod pallet {
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
-        /// Genesis Initial IP Deposit
+        /// The amount of initial deposit for IP registration
         pub initial_ip_deposit: BalanceOf<T>,
+        /// The initial price for storage of 1 MB per block
         pub initial_price_storage_mb_per_block: BalanceOf<T>,
     }
 
@@ -122,6 +135,7 @@ pub mod pallet {
         }
     }
 
+    /// The amount of initial deposit for IP registration
     #[pallet::storage]
     #[pallet::getter(fn ip_deposit_amount)]
     pub type IPDepositAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
@@ -131,21 +145,27 @@ pub mod pallet {
     #[pallet::getter(fn ip_cost_per_unit)]
     pub type CurrentPrices<T: Config> = StorageValue<_, Prices<T>, ValueQuery>;
 
+    /// IPs currently existing in the network
     #[pallet::storage]
     #[pallet::getter(fn get_ip)]
     pub type InfrastructureProviders<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, IPDetails<T>>;
 
+    /// Agreements currently existing in the network
     #[pallet::storage]
     #[pallet::getter(fn get_agreement)]
     pub(super) type Agreements<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AgreementId, AgreementDetails<T>>;
 
+    /// Customers` agreements currently existing in the network. This is a mapping from the customer
+    /// to a vector of agreement ids.
     #[pallet::storage]
     #[pallet::getter(fn get_consumer_agreement)]
     pub(super) type ConsumerAgreements<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, ConsumerAgreementsVec<T>, ValueQuery>;
 
+    /// Current agreement id. This is used to assign a unique id to each created agreement.
+    /// The id is incremented by one for each new agreement.
     #[pallet::storage]
     #[pallet::getter(fn current_agreement_id)]
     pub type CurrentAgreementId<T: Config> = StorageValue<_, T::AgreementId, ValueQuery>;
@@ -153,53 +173,90 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// A user has successfully set a new value.
+        /// An IP has been registered
         IPRegistered {
+            /// The IP that has been registered
             ip: T::AccountId,
+            /// The total storage of the IP
             total_storage: StorageSizeMB,
         },
+        /// An IP has updated its storage amount
         IPStorageUpdated {
+            /// The IP that has updated its storage amount
             ip: T::AccountId,
+            /// The new total storage of the IP
             total_storage: StorageSizeMB,
         },
+        /// An IP has updated its status
         IPStatusChanged {
+            /// The IP that has updated its status
             ip: T::AccountId,
+            /// The new status of the IP
             status: IPStatus,
         },
+        /// An IP has been unregistered
         IPUnregistered {
+            /// The IP that has been unregistered
             ip: T::AccountId,
         },
+        /// The price for storage per block has been updated
         StoragePriceUnitUpdated {
+            /// The new price for storage per block
             price_storage_per_block: BalanceOf<T>,
         },
+        /// A consumer has requested an agreement
         ConsumerRequestedAgreement {
+            /// The agreement id
             agreement_id: T::AgreementId,
+            /// The IP the agreement is with
             ip: T::AccountId,
+            /// The consumer requesting the agreement
             consumer: T::AccountId,
+            /// The deposit the consumer has payed to secure the agreement
             consumer_deposit: BalanceOf<T>,
+            /// The amount of storage covered by the agreement
             storage: StorageSizeMB,
+            /// The block number when the rental starts
             activation_block: BlockNumberFor<T>,
+            /// The payment plan for the agreement
             payment_plan: PaymentPlan<T>,
         },
+        /// A consumer has revoked an agreement
         ConsumerRevokedAgreement {
+            /// The agreement id
             agreement_id: T::AgreementId,
+            /// The IP the agreement is with
             ip: T::AccountId,
+            /// The consumer revoking the agreement
             consumer: T::AccountId,
         },
+        /// An IP has accepted an agreement
         IPAcceptedAgreement {
+            /// The agreement id
             agreement_id: T::AgreementId,
+            /// The IP accepting the agreement
             ip: T::AccountId,
+            /// The consumer the agreement is with
             consumer: T::AccountId,
         },
+        /// An IP has proposed a new payment plan
         IPProposedPaymentPlan {
+            /// The agreement id
             agreement_id: T::AgreementId,
+            /// The IP proposing the new payment plan
             ip: T::AccountId,
+            /// The consumer the agreement is with
             consumer: T::AccountId,
+            /// The new payment plan
             payment_plan: PaymentPlan<T>,
         },
+        /// A consumer has accepted an agreement
         ConsumerAcceptedAgreement {
+            /// The agreement id
             agreement_id: T::AgreementId,
+            /// The IP the agreement is with
             ip: T::AccountId,
+            /// The consumer accepting the agreement
             consumer: T::AccountId,
         },
     }
@@ -233,6 +290,10 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
+        /// Register an IP. The IP must not be registered already, or must have been unregistered.
+        /// The IP must pay a deposit to register. The deposit is returned when the IP unregisters.
+        /// The IP must also specify the total storage it has.
+        /// The IP is registered with status `Pending` and must be activated by the network operator.
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::ip_register())]
         pub fn ip_register(origin: OriginFor<T>, total_storage: StorageSizeMB) -> DispatchResult {
@@ -265,8 +326,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// This is a temporary call to manage the IP status.
-        /// Statuses updates should be done automatically after an environment software check.
+        /// Update the status of an IP. Only the network operator can update the status of an IP.
         #[pallet::call_index(1)]
         #[pallet::weight(T::WeightInfo::update_ip_status())]
         pub fn update_ip_status(
@@ -287,6 +347,7 @@ pub mod pallet {
             Self::success_event(Event::IPStatusChanged { ip, status })
         }
 
+        /// Update the total storage of an IP.
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::ip_update_storage())]
         pub fn ip_update_storage(
@@ -305,6 +366,8 @@ pub mod pallet {
             Self::success_event(Event::IPStorageUpdated { ip, total_storage })
         }
 
+        /// Unregister an IP. The IP must be registered and must not have any agreements in progress.
+        /// The IP gets back the deposit it payed during registration.
         #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::ip_unregister())]
         pub fn ip_unregister(origin: OriginFor<T>) -> DispatchResult {
@@ -337,6 +400,8 @@ pub mod pallet {
             Self::success_event(Event::IPUnregistered { ip })
         }
 
+        /// Update the price for storage per block. Only the network operator can update the price.
+        /// This change doesn't affect installments that have already been paid.
         #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::update_storage_cost_per_unit())]
         pub fn update_storage_cost_per_unit(
@@ -354,6 +419,14 @@ pub mod pallet {
             })
         }
 
+        /// Request an agreement with an IP. The IP must be registered and active. The consumer must
+        /// pay a deposit to secure the agreement. The deposit is returned if the consumer revokes
+        /// the agreement, or is used to pay for the last installment. The consumer must specify the
+        /// amount of storage it needs, the block number when the rental starts and the payment plan.
+        ///
+        /// The payment plan must is a vector of block numbers. Every element represents the
+        /// end of an installment. The first installment starts at the activation block. The last element
+        /// is the end of the rental. The payment plan must be strictly increasing and contain at least 1 element.
         #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::consumer_request_agreement())]
         #[frame_support::transactional]
@@ -403,7 +476,7 @@ pub mod pallet {
 
             let consumer_deposit = agreement.hold_consumer_deposit()?;
 
-            let agreement_id = Self::create_agreement(agreement)?;
+            let agreement_id = Self::insert_agreement(agreement)?;
 
             Self::success_event(Event::ConsumerRequestedAgreement {
                 agreement_id,
@@ -416,6 +489,9 @@ pub mod pallet {
             })
         }
 
+        /// Revoke an agreement. The agreement must be in progress. The consumer gets back the deposit
+        /// it payed to secure the agreement. Only the consumer can revoke the agreement. The agreement
+        /// can be revoked only if it is not accepted yet.
         #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::consumer_revoke_agreement())]
         pub fn consumer_revoke_agreement(
@@ -451,6 +527,9 @@ pub mod pallet {
             })
         }
 
+        /// Accept an agreement by the IP that the agreement is with. The activation block must not be
+        /// in the past. The status of the agreement must be `ConsumerRequest`. The agreement is
+        /// accepted by the IP and the status changes to `Agreed`.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::ip_accept_agreement())]
         pub fn ip_accept_agreement(
@@ -492,6 +571,7 @@ pub mod pallet {
             })
         }
 
+        /// Propose a new payment plan for an agreement. The agreement status must be `ConsumerRequest`.
         #[pallet::call_index(8)]
         #[pallet::weight(T::WeightInfo::ip_propose_payment_plan())]
         pub fn ip_propose_payment_plan(
@@ -536,6 +616,8 @@ pub mod pallet {
             })
         }
 
+        /// Accept a payment plan proposed by an IP. The agreement status must be `IPProposedPaymentPlan`.
+        /// The consumer deposit is adjusted to the new payment plan. The agreement status changes to `Agreed`.
         #[pallet::call_index(9)]
         #[pallet::weight(T::WeightInfo::consumer_accept_agreement())]
         pub fn consumer_accept_agreement(
@@ -574,6 +656,7 @@ pub mod pallet {
             })
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
@@ -587,6 +670,7 @@ pub mod pallet {
             Ok(())
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
         pub fn withdraw_provider_funds(
@@ -600,6 +684,7 @@ pub mod pallet {
             Ok(())
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(12)]
         #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
         pub fn submit_provider_feedback(
@@ -613,6 +698,7 @@ pub mod pallet {
             Ok(())
         }
 
+        /// UNDER CONSTRUCTION
         #[pallet::call_index(13)]
         #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
         pub fn submit_consumer_feedback(

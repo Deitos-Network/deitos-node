@@ -6,15 +6,18 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use crate::*;
 
 impl<T: Config> Pallet<T> {
+    /// Deposits an event on a successful operation.
     pub fn success_event(event: Event<T>) -> DispatchResult {
         Self::deposit_event(event);
         Ok(())
     }
 
+    /// Returns the current block number.
     pub fn current_block_number() -> BlockNumberFor<T> {
         frame_system::Pallet::<T>::block_number()
     }
 
+    /// Generates the next agreement id and returns it.
     pub fn next_agreement_id() -> T::AgreementId {
         CurrentAgreementId::<T>::mutate(|value| {
             *value = value.add(One::one());
@@ -22,8 +25,9 @@ impl<T: Config> Pallet<T> {
         })
     }
 
+    /// Inserts a new agreement into the proper storages and returns the agreement id.
     #[transactional]
-    pub fn create_agreement(
+    pub fn insert_agreement(
         agreement: AgreementDetails<T>,
     ) -> Result<T::AgreementId, DispatchError> {
         let agreement_id = Self::next_agreement_id();
@@ -48,6 +52,7 @@ impl<T: Config> Pallet<T> {
         Ok(agreement_id)
     }
 
+    /// Deletes an agreement updating the proper storages and returns the agreement details.
     pub fn delete_agreement(
         agreement_id: T::AgreementId,
     ) -> Result<AgreementDetails<T>, DispatchError> {
