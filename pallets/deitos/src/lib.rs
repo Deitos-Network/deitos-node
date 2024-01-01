@@ -1,6 +1,5 @@
 // Deitos pallet
 // TODO: Add documentation
-#![allow(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
@@ -9,7 +8,6 @@ use frame_support::{
     traits::{
         tokens::{
             fungible::{
-                self,
                 hold::{
                     Balanced as BalancedHold, Mutate as FunHoldMutate,
                     Unbalanced as FunHoldUnbalanced,
@@ -25,12 +23,11 @@ use frame_support::{
 pub use log;
 pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use sp_runtime::{
-    traits::{CheckedMul, One, Saturating, StaticLookup, Zero},
+    traits::{One, Saturating, StaticLookup, Zero},
     BoundedVec, SaturatedConversion,
 };
 use sp_std::{convert::TryInto, prelude::*};
 
-pub use impls::*;
 #[warn(unused_imports)]
 pub use pallet::*;
 pub use types::*;
@@ -283,7 +280,7 @@ pub mod pallet {
             InfrastructureProviders::<T>::try_mutate(&ip, |ip_details| {
                 ip_details
                     .as_mut()
-                    .map(|mut x| x.status = status)
+                    .map(|x| x.status = status)
                     .ok_or(Error::<T>::IPNotFound)
             })?;
 
@@ -301,7 +298,7 @@ pub mod pallet {
             InfrastructureProviders::<T>::try_mutate(&ip, |ip_details| {
                 ip_details
                     .as_mut()
-                    .map(|mut x| x.total_storage = total_storage)
+                    .map(|x| x.total_storage = total_storage)
                     .ok_or(Error::<T>::IPNotFound)
             })?;
 
@@ -581,11 +578,11 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::make_installment_payment())]
         pub fn make_installment_payment(
             origin: OriginFor<T>,
-            ip: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _ip: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
@@ -594,11 +591,11 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
         pub fn withdraw_provider_funds(
             origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _consumer: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
@@ -607,23 +604,24 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
         pub fn submit_provider_feedback(
             origin: OriginFor<T>,
-            consumer: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _consumer: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
 
+        #[pallet::call_index(13)]
         #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
         pub fn submit_consumer_feedback(
             origin: OriginFor<T>,
-            ip: AccountIdLookupOf<T>,
-            agreement_id: T::AgreementId,
+            _ip: AccountIdLookupOf<T>,
+            _agreement_id: T::AgreementId,
         ) -> DispatchResult {
             // Check that the extrinsic was signed and get the signer.
-            let who = ensure_signed(origin)?;
+            let _who = ensure_signed(origin)?;
 
             Ok(())
         }
