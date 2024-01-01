@@ -51,8 +51,7 @@ impl<T: Config> Pallet<T> {
     pub fn delete_agreement(
         agreement_id: T::AgreementId,
     ) -> Result<AgreementDetails<T>, DispatchError> {
-        let agreement =
-            Agreements::<T>::take(agreement_id).ok_or(Error::<T>::AgreementNotFound)?;
+        let agreement = Agreements::<T>::take(agreement_id).ok_or(Error::<T>::AgreementNotFound)?;
         InfrastructureProviders::<T>::mutate(&agreement.ip, |ip_details| {
             ip_details.as_mut().and_then(|x| {
                 x.agreements
