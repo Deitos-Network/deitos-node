@@ -11,10 +11,11 @@ use sp_runtime::{
 };
 
 use crate as pallet_deitos;
-use crate::{IPStatus, StorageSizeMB};
+use crate::{CurrentAgreementId, IPStatus, PaymentPlan, StorageSizeMB};
 
 mod agreements;
 mod ip;
+mod payments;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -34,6 +35,7 @@ parameter_types! {
 
 type AccountId = u64;
 type Balance = u64;
+type AgreementId = u32;
 
 pub const IP_INITIAL_DEPOSIT: Balance = 1_000_000;
 pub const PRICE_STORAGE: Balance = 10;
@@ -72,7 +74,7 @@ impl pallet_balances::Config for Test {
     type RuntimeHoldReason = RuntimeHoldReason;
     type RuntimeFreezeReason = ();
     type WeightInfo = ();
-    type Balance = u64;
+    type Balance = Balance;
     type DustRemoval = ();
     type ExistentialDeposit = ConstU64<1>;
     type AccountStore = System;
@@ -89,7 +91,7 @@ impl pallet_deitos::Config for Test {
     type Currency = Balances;
     type RuntimeHoldReason = RuntimeHoldReason;
     type WeightInfo = ();
-    type AgreementId = u32;
+    type AgreementId = AgreementId;
     type PaymentPlanLimit = ConstU32<500>;
     type IPAgreementsLimit = ConstU32<500>;
     type ConsumerAgreementsLimit = ConstU32<500>;
@@ -149,4 +151,28 @@ fn register_and_activate_ip(ip: AccountId, total_storage: StorageSizeMB) {
         ip,
         IPStatus::Active
     ));
+}
+
+fn create_accepted_agreement(
+    ip: AccountId,
+    consumer: AccountId,
+    storage: StorageSizeMB,
+    activation_block: u64,
+    payment_plan: PaymentPlan<Test>,
+) -> AgreementId {
+    assert_ok!(Deitos::consumer_request_agreement(
+        RuntimeOrigin::signed(consumer),
+        ip,
+        storage,
+        activation_block,
+        payment_plan,
+    ));
+
+    let agreement_id = CurrentAgreementId::<Test>::get();
+    assert_ok!(Deitos::ip_accept_agreement(
+        RuntimeOrigin::signed(ip),
+        agreement_id,
+    ));
+
+    agreement_id
 }

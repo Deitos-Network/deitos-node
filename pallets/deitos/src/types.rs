@@ -48,17 +48,17 @@ pub enum IPStatus {
 }
 
 /// The statuses an agreement can have. When a consumer requests an agreement the status is
-/// `ConsumerRequest`. The IP can agree to the agreement and the status changes to `Agreed`, or
+/// `ConsumerRequest`. The IP can agree to the agreement and the status changes to `Active`, or
 /// the IP can propose a payment plan and the status changes to `IPProposedPaymentPlan`. If the
-/// consumer accepts the payment plan the status changes to `Agreed`.
+/// consumer accepts the payment plan the status changes to `Active`.
 #[derive(Copy, Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
 pub enum AgreementStatus {
     /// Consumer requested an agreement
     ConsumerRequest,
     /// IP proposed a different payment plan
     IPProposedPaymentPlan,
-    /// Agreement is agreed
-    Agreed,
+    /// Agreement is active
+    Active,
 }
 
 /// The details of an IP. The IP has:
@@ -79,6 +79,21 @@ pub struct IPDetails<T: pallet::Config> {
     /// Deposit funds
     pub deposit: BalanceOf<T>,
 }
+
+/// An item of the payment history.
+#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+#[codec(mel_bound(T: pallet::Config))]
+pub struct PaymentRecord<T: pallet::Config> {
+    /// The amount of the installment. This is held from the consumer and transferred to the IP
+    /// when the installment is due.
+    pub amount: BalanceOf<T>,
+    /// Flag indicating if the installment is transferred to the IP.
+    pub transferred: bool,
+}
+
+/// The payment history for the agreement. The payment history is a vector of payment records.
+pub type PaymentHistory<T> = BoundedVec<PaymentRecord<T>, <T as Config>::PaymentPlanLimit>;
 
 /// The details of an agreement. The agreement has:
 /// - `ip` - the IP the agreement is with
@@ -106,26 +121,53 @@ pub struct AgreementDetails<T: pallet::Config> {
     pub activation_block: BlockNumberFor<T>,
     /// The payment plan for the agreement
     pub payment_plan: PaymentPlan<T>,
+    /// The payment history for the agreement
+    pub payment_history: PaymentHistory<T>,
 }
 
 impl<T: pallet::Config> AgreementDetails<T> {
-    /// Calculate the deposit amount for the consumer based on the payment plan. The deposit is
-    /// the cost of the storage for the last installment.
-    fn calculate_consumer_deposit(
-        activation_block: BlockNumberFor<T>,
-        payment_plan: &PaymentPlan<T>,
-    ) -> BalanceOf<T> {
-        let last_installment_length = match payment_plan.as_slice() {
-            [.., prev, last] => last.saturating_sub(*prev),
-            [single] => single.saturating_sub(activation_block),
-            _ => unreachable!("empty payment plan is not allowed"),
-        };
+    /// Calculate the length of an installment. The length of the installment is the difference
+    /// between the end block number of the installment and the end block number of the previous
+    /// installment. The length of the first installment is the difference between the end block
+    /// number of the first installment and the activation block.
+    ///
+    /// The installment index is the index of the installment in the payment plan. The first
+    /// installment has index 0.
+    ///
+    /// Returns `None` if the installment index is out of bounds.
+    fn calculate_installment_length(&self, installment_index: usize) -> Option<BlockNumberFor<T>> {
+        let end_block = self.payment_plan.get(installment_index)?;
+        let start_block = installment_index
+            .checked_sub(1)
+            .map(|i| self.payment_plan[i])
+            .unwrap_or(self.activation_block);
 
-        CurrentPrices::<T>::get()
+        Some(end_block.saturating_sub(start_block))
+    }
+
+    /// Calculate the cost of an installment. The cost of the installment is the length of the
+    /// installment multiplied by the storage cost per block.
+    ///
+    /// The installment index is the index of the installment in the payment plan. The first
+    /// installment has index 0.
+    ///
+    /// Returns `None` if the installment index is out of bounds.
+    fn calculate_installment_cost(&self, installment_index: usize) -> Option<BalanceOf<T>> {
+        let installment_length = self.calculate_installment_length(installment_index)?;
+        let cost = CurrentPrices::<T>::get()
             .storage_mb_per_block
             .saturating_mul(BalanceOf::<T>::saturated_from(
-                last_installment_length.saturated_into::<u128>(),
-            ))
+                installment_length.saturated_into::<u128>(),
+            ));
+
+        Some(cost)
+    }
+
+    /// Calculate the deposit amount for the consumer based on the payment plan. The deposit is
+    /// the cost of the storage for the last installment.
+    fn calculate_consumer_deposit(&self) -> BalanceOf<T> {
+        self.calculate_installment_cost(self.payment_plan.len() - 1)
+            .expect("empty payment plan is not allowed")
     }
 
     /// Create a new agreement with the status `ConsumerRequest`. The deposit is not calculated
@@ -145,6 +187,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
             storage,
             activation_block,
             payment_plan,
+            payment_history: PaymentHistory::new(),
         }
     }
 
@@ -152,8 +195,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
     /// last installment. The deposit is calculated based on the payment plan and stored in the
     /// agreement.
     pub fn hold_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
-        self.consumer_deposit =
-            Self::calculate_consumer_deposit(self.activation_block, &self.payment_plan);
+        self.consumer_deposit = self.calculate_consumer_deposit();
 
         T::Currency::hold(
             &HoldReason::ConsumerDeposit.into(),
@@ -182,10 +224,11 @@ impl<T: pallet::Config> AgreementDetails<T> {
     /// changed. The deposit amount currently held is adjusted to the new deposit amount.
     /// The new deposit amount is calculated based on the new payment plan and stored in the
     /// agreement.
+    ///
+    /// Returns the new deposit amount.
     pub fn adjust_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
         let current_deposit = self.consumer_deposit;
-        let new_deposit =
-            Self::calculate_consumer_deposit(self.activation_block, &self.payment_plan);
+        let new_deposit = self.calculate_consumer_deposit();
 
         match current_deposit.cmp(&new_deposit) {
             Ordering::Less => T::Currency::hold(
@@ -205,6 +248,40 @@ impl<T: pallet::Config> AgreementDetails<T> {
 
         self.consumer_deposit = new_deposit;
         Ok(new_deposit)
+    }
+
+    /// Holds the next installment for the agreement. The installment is calculated based on the
+    /// payment plan and stored in the agreement's payment history.
+    ///
+    /// Returns the amount of the installment.
+    pub fn hold_next_installment(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+        let installment_index = self.payment_history.len();
+
+        // Last installment is already paid with the consumer deposit
+        ensure!(
+            installment_index < self.payment_plan.len() - 1,
+            Error::<T>::NoMoreInstallments
+        );
+
+        let installment_cost = self
+            .calculate_installment_cost(installment_index)
+            .ok_or(Error::<T>::NoMoreInstallments)?;
+
+        T::Currency::hold(
+            &HoldReason::ConsumerInstallment.into(),
+            &self.consumer,
+            installment_cost,
+        )?;
+
+        self.payment_history
+            .try_push(PaymentRecord {
+                amount: installment_cost,
+                transferred: false,
+            })
+            .map_err(|_| ())
+            .expect("payment history should never exceed the payment plan");
+
+        Ok(installment_cost)
     }
 }
 
