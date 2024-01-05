@@ -104,7 +104,7 @@ fn test_ip_accept_agreement() {
 
         // Verify that the agreement status is correctly updated
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
-        assert_eq!(stored_agreement.status, AgreementStatus::Agreed);
+        assert_eq!(stored_agreement.status, AgreementStatus::Active);
 
         // Check for the correct event emission
         System::assert_has_event(RuntimeEvent::Deitos(Event::IPAcceptedAgreement {
@@ -121,6 +121,7 @@ fn test_consumer_accept_agreement() {
         let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
         let payment_plan: PaymentPlan<Test> = vec![activation_block + 300].try_into().unwrap();
+        let initial_consumer_deposit = 300 * PRICE_STORAGE;
 
         // Register and activate the IP
         register_and_activate_ip(IP, storage);
@@ -156,7 +157,7 @@ fn test_consumer_accept_agreement() {
         let expected_consumer_deposit = 200 * PRICE_STORAGE; // Length of last installment * price per block
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
         assert_eq!(stored_agreement.consumer_deposit, expected_consumer_deposit);
-        assert_eq!(stored_agreement.status, AgreementStatus::Agreed);
+        assert_eq!(stored_agreement.status, AgreementStatus::Active);
         assert_eq!(stored_agreement.payment_plan, new_payment_plan);
 
         // Verify that the consumer's balance is properly updated
@@ -178,6 +179,8 @@ fn test_consumer_accept_agreement() {
             agreement_id,
             ip: IP,
             consumer: CONSUMER,
+            consumer_deposit_released: initial_consumer_deposit,
+            consumer_deposit_held: expected_consumer_deposit,
         }));
     });
 }
@@ -188,6 +191,7 @@ fn consumer_reject_proposal() {
         let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
         let payment_plan: PaymentPlan<Test> = vec![activation_block + 300].try_into().unwrap();
+        let consumer_deposit = 300 * PRICE_STORAGE;
 
         // Register and activate the IP
         register_and_activate_ip(IP, storage);
@@ -246,6 +250,7 @@ fn consumer_reject_proposal() {
             agreement_id,
             ip: IP,
             consumer: CONSUMER,
+            consumer_deposit,
         }));
     });
 }

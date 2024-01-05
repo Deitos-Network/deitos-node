@@ -111,9 +111,12 @@ pub mod pallet {
         /// Initial deposit for IP registration
         #[codec(index = 0)]
         IPInitialDeposit,
-        /// Consumer deposit for agreement
+        /// Consumer deposit for securing an agreement
         #[codec(index = 1)]
         ConsumerDeposit,
+        /// Consumer installment payment
+        #[codec(index = 2)]
+        ConsumerInstallment,
     }
 
     #[pallet::genesis_config]
@@ -204,6 +207,13 @@ pub mod pallet {
             /// The new price for storage per block
             price_storage_per_block: BalanceOf<T>,
         },
+        /// An agreement status has changed
+        AgreementStatusChanged {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The new status of the agreement
+            status: AgreementStatus,
+        },
         /// A consumer has requested an agreement
         ConsumerRequestedAgreement {
             /// The agreement id
@@ -229,6 +239,8 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer revoking the agreement
             consumer: T::AccountId,
+            /// The deposit released
+            consumer_deposit: BalanceOf<T>,
         },
         /// An IP has accepted an agreement
         IPAcceptedAgreement {
@@ -258,6 +270,37 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer accepting the agreement
             consumer: T::AccountId,
+            /// The previously held deposit, which is released now
+            consumer_deposit_released: BalanceOf<T>,
+            /// The new deposit, which is held now
+            consumer_deposit_held: BalanceOf<T>,
+        },
+        /// A consumer has prepaid an installment
+        ConsumerPrepaidInstallment {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The consumer prepaying the installment
+            consumer: T::AccountId,
+            /// The cost of the installment
+            cost: BalanceOf<T>,
+        },
+        /// An IP has withdrawn installments
+        IPWithdrewInstallments {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP withdrawing the installments
+            ip: T::AccountId,
+            /// The total amount withdrawn
+            transferred: BalanceOf<T>,
+        },
+        /// An IP has terminated an agreement due to non-payment
+        IPTerminatedNonPay {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The IP terminating the agreement
+            ip: T::AccountId,
+            /// The total amount transferred to the IP
+            transferred: BalanceOf<T>,
         },
     }
 
@@ -286,6 +329,10 @@ pub mod pallet {
         AgreementInProgress,
         /// Agreement status invalid
         AgreementStatusInvalid,
+        /// No unpaid installments found.
+        /// E.g., the consumer cannot prepay any more installments, or the IP cannot terminate the agreement
+        /// due to non-payment, because all installments have been paid.
+        NoUnpaidInstallments,
     }
 
     #[pallet::call]
@@ -516,7 +563,7 @@ pub mod pallet {
                 Error::<T>::AgreementInProgress
             );
 
-            agreement.release_consumer_deposit()?;
+            let consumer_deposit = agreement.release_consumer_deposit()?;
 
             Self::delete_agreement(agreement_id)?;
 
@@ -524,12 +571,13 @@ pub mod pallet {
                 agreement_id,
                 ip: agreement.ip,
                 consumer,
+                consumer_deposit,
             })
         }
 
         /// Accept an agreement by the IP that the agreement is with. The activation block must not be
         /// in the past. The status of the agreement must be `ConsumerRequest`. The agreement is
-        /// accepted by the IP and the status changes to `Agreed`.
+        /// accepted by the IP and the status changes to `Active`.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::ip_accept_agreement())]
         pub fn ip_accept_agreement(
@@ -559,7 +607,7 @@ pub mod pallet {
                         Error::<T>::AgreementOutdated
                     );
 
-                    agreement.status = AgreementStatus::Agreed;
+                    agreement.update_status(agreement_id, AgreementStatus::Active);
                     Ok(agreement.consumer.clone())
                 },
             )?;
@@ -601,8 +649,8 @@ pub mod pallet {
                         Error::<T>::PaymentPlanInvalid
                     );
 
-                    agreement.status = AgreementStatus::IPProposedPaymentPlan;
                     agreement.payment_plan = payment_plan.clone();
+                    agreement.update_status(agreement_id, AgreementStatus::IPProposedPaymentPlan);
 
                     Ok(agreement.consumer.clone())
                 },
@@ -617,7 +665,7 @@ pub mod pallet {
         }
 
         /// Accept a payment plan proposed by an IP. The agreement status must be `IPProposedPaymentPlan`.
-        /// The consumer deposit is adjusted to the new payment plan. The agreement status changes to `Agreed`.
+        /// The consumer deposit is adjusted to the new payment plan. The agreement status changes to `Active`.
         #[pallet::call_index(9)]
         #[pallet::weight(T::WeightInfo::consumer_accept_agreement())]
         pub fn consumer_accept_agreement(
@@ -626,7 +674,52 @@ pub mod pallet {
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
 
-            let ip = Agreements::<T>::try_mutate(
+            let (ip, consumer_deposit_released, consumer_deposit_held) =
+                Agreements::<T>::try_mutate(
+                    agreement_id,
+                    |agreement| -> Result<_, DispatchError> {
+                        let agreement = agreement.as_mut().ok_or(Error::<T>::AgreementNotFound)?;
+
+                        // Check that the transaction was signed by the consumer
+                        ensure!(
+                            agreement.consumer == consumer,
+                            Error::<T>::AgreementNotFound
+                        );
+
+                        // Check that IP has proposed a payment plan
+                        ensure!(
+                            agreement.status == AgreementStatus::IPProposedPaymentPlan,
+                            Error::<T>::AgreementStatusInvalid
+                        );
+
+                        let old_deposit = agreement.consumer_deposit;
+                        let new_deposit = agreement.adjust_consumer_deposit()?;
+
+                        agreement.update_status(agreement_id, AgreementStatus::Active);
+                        Ok((agreement.ip.clone(), old_deposit, new_deposit))
+                    },
+                )?;
+
+            Self::success_event(Event::ConsumerAcceptedAgreement {
+                agreement_id,
+                ip,
+                consumer,
+                consumer_deposit_released,
+                consumer_deposit_held,
+            })
+        }
+
+        /// Prepay an installment. The agreement status must be `Active`. The consumer pays the cost
+        /// of the next unpaid installment. All payments are saved in the agreement's payment history.
+        #[pallet::call_index(10)]
+        #[pallet::weight(T::WeightInfo::consumer_prepay_installment())]
+        pub fn consumer_prepay_installment(
+            origin: OriginFor<T>,
+            agreement_id: T::AgreementId,
+        ) -> DispatchResult {
+            let consumer = ensure_signed(origin)?;
+
+            let cost = Agreements::<T>::try_mutate(
                 agreement_id,
                 |agreement| -> Result<_, DispatchError> {
                     let agreement = agreement.as_mut().ok_or(Error::<T>::AgreementNotFound)?;
@@ -637,65 +730,108 @@ pub mod pallet {
                         Error::<T>::AgreementNotFound
                     );
 
-                    // Check that IP has proposed a payment plan
+                    // Check that the agreement is in progress
                     ensure!(
-                        agreement.status == AgreementStatus::IPProposedPaymentPlan,
+                        agreement.status == AgreementStatus::Active,
                         Error::<T>::AgreementStatusInvalid
                     );
 
-                    agreement.adjust_consumer_deposit()?;
-                    agreement.status = AgreementStatus::Agreed;
-                    Ok(agreement.ip.clone())
+                    let cost = agreement.hold_next_installment()?;
+                    Ok(cost)
                 },
             )?;
 
-            Self::success_event(Event::ConsumerAcceptedAgreement {
+            Self::success_event(Event::ConsumerPrepaidInstallment {
                 agreement_id,
-                ip,
                 consumer,
+                cost,
             })
         }
 
-        /// UNDER CONSTRUCTION
-        #[pallet::call_index(10)]
-        #[pallet::weight(T::WeightInfo::make_installment_payment())]
-        pub fn make_installment_payment(
-            origin: OriginFor<T>,
-            _ip: AccountIdLookupOf<T>,
-            _agreement_id: T::AgreementId,
-        ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let _who = ensure_signed(origin)?;
-
-            Ok(())
-        }
-
-        /// UNDER CONSTRUCTION
+        /// Withdraw installments. The agreement status must be `Active`. The IP withdraws all complete installments
+        /// from the agreement. The IP can withdraw installments only if the consumer has prepaid them.
+        ///
+        /// If the agreement is fully paid, the status changes to `Completed`.
         #[pallet::call_index(11)]
-        #[pallet::weight(T::WeightInfo::withdraw_provider_funds())]
-        pub fn withdraw_provider_funds(
+        #[pallet::weight(T::WeightInfo::ip_withdraw_installments())]
+        pub fn ip_withdraw_installments(
             origin: OriginFor<T>,
-            _consumer: AccountIdLookupOf<T>,
-            _agreement_id: T::AgreementId,
+            agreement_id: T::AgreementId,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let _who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
 
-            Ok(())
+            let transferred = Agreements::<T>::try_mutate(
+                agreement_id,
+                |agreement| -> Result<_, DispatchError> {
+                    let agreement = agreement.as_mut().ok_or(Error::<T>::AgreementNotFound)?;
+
+                    // Check that the transaction was signed by the IP
+                    ensure!(agreement.ip == ip, Error::<T>::AgreementNotFound);
+
+                    // Check that the agreement is in progress
+                    ensure!(
+                        agreement.status == AgreementStatus::Active,
+                        Error::<T>::AgreementStatusInvalid
+                    );
+
+                    let current_block_number = Self::current_block_number();
+                    let transferred = agreement.transfer_installments(current_block_number)?;
+
+                    // Check if all installments have been withdrawn
+                    if agreement.consumer_deposit_transferred {
+                        agreement.update_status(agreement_id, AgreementStatus::Completed);
+                    }
+
+                    Ok(transferred)
+                },
+            )?;
+
+            Self::success_event(Event::IPWithdrewInstallments {
+                agreement_id,
+                ip,
+                transferred,
+            })
         }
 
-        /// UNDER CONSTRUCTION
+        /// Terminate an agreement due to non-payment. The agreement status must be `Active`. The IP
+        /// receives all unpaid installments and the consumer deposit. The agreement is deleted.
         #[pallet::call_index(12)]
-        #[pallet::weight(T::WeightInfo::submit_provider_feedback())]
-        pub fn submit_provider_feedback(
+        #[pallet::weight(T::WeightInfo::ip_terminate_nonpay())]
+        pub fn ip_terminate_nonpay(
             origin: OriginFor<T>,
-            _consumer: AccountIdLookupOf<T>,
-            _agreement_id: T::AgreementId,
+            agreement_id: T::AgreementId,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let _who = ensure_signed(origin)?;
+            let ip = ensure_signed(origin)?;
 
-            Ok(())
+            let mut agreement =
+                Self::get_agreement(agreement_id).ok_or(Error::<T>::AgreementNotFound)?;
+
+            // Check that the transaction was signed by the IP
+            ensure!(agreement.ip == ip, Error::<T>::AgreementNotFound);
+
+            // Check that the agreement is in progress
+            ensure!(
+                agreement.status == AgreementStatus::Active,
+                Error::<T>::AgreementStatusInvalid
+            );
+
+            let current_block_number = Self::current_block_number();
+            let transferred = agreement
+                .has_overdue_installments(current_block_number)
+                .then(|| -> Result<_, DispatchError> {
+                    let total = agreement.transfer_installments(current_block_number)?;
+                    let deposit = agreement.transfer_consumer_deposit()?;
+                    Self::delete_agreement(agreement_id)?;
+
+                    Ok(total.saturating_add(deposit))
+                })
+                .ok_or(Error::<T>::NoUnpaidInstallments)??;
+
+            Self::success_event(Event::IPTerminatedNonPay {
+                agreement_id,
+                ip,
+                transferred,
+            })
         }
 
         /// UNDER CONSTRUCTION
