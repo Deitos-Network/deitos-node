@@ -1,5 +1,6 @@
 use core::cmp::Ordering;
 
+use frame_support::traits::tokens::{Fortitude::Polite, Restriction::Free};
 use frame_system::pallet_prelude::BlockNumberFor;
 use scale_info::TypeInfo;
 
@@ -59,6 +60,8 @@ pub enum AgreementStatus {
     IPProposedPaymentPlan,
     /// Agreement is active
     Active,
+    /// Agreement is completed, meaning that the IP has received all the payments
+    Completed,
 }
 
 /// The details of an IP. The IP has:
@@ -92,8 +95,32 @@ pub struct PaymentRecord<T: pallet::Config> {
     pub transferred: bool,
 }
 
-/// The payment history for the agreement. The payment history is a vector of payment records.
-pub type PaymentHistory<T> = BoundedVec<PaymentRecord<T>, <T as Config>::PaymentPlanLimit>;
+/// A vector of payment records. The vector is bounded by the maximum number of installments
+/// in the payment plan (PaymentPlanLimit).
+pub type PaymentRecords<T> = BoundedVec<PaymentRecord<T>, <T as Config>::PaymentPlanLimit>;
+
+/// The payment history for the agreement. The payment history has:
+/// - `records` - the vector of payment records
+/// - `next_transfer_installment_index` - the index of the next installment to be transferred to
+/// the IP
+#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+#[codec(mel_bound(T: pallet::Config))]
+pub struct PaymentHistory<T: pallet::Config> {
+    /// Payment records
+    pub records: PaymentRecords<T>,
+    /// Next installment to be transferred to the IP
+    pub next_transfer_installment_index: u32,
+}
+
+impl<T: pallet::Config> PaymentHistory<T> {
+    fn new() -> Self {
+        Self {
+            records: PaymentRecords::new(),
+            next_transfer_installment_index: 0,
+        }
+    }
+}
 
 /// The details of an agreement. The agreement has:
 /// - `ip` - the IP the agreement is with
@@ -103,6 +130,7 @@ pub type PaymentHistory<T> = BoundedVec<PaymentRecord<T>, <T as Config>::Payment
 /// - `storage` - the amount of storage covered by the agreement
 /// - `activation_block` - the block number when the rental starts
 /// - `payment_plan` - the payment plan for the agreement
+/// - `payment_history` - the payment history for the agreement
 #[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
@@ -191,31 +219,39 @@ impl<T: pallet::Config> AgreementDetails<T> {
         }
     }
 
+    /// Update the status of the agreement and emit a corresponding event.
+    pub fn update_status(&mut self, agreement_id: T::AgreementId, new_status: AgreementStatus) {
+        self.status = new_status;
+
+        Pallet::<T>::deposit_event(Event::AgreementStatusChanged {
+            agreement_id,
+            status: new_status,
+        });
+    }
+
     /// Holds the consumer deposit for the agreement. The deposit is the cost of the storage for the
     /// last installment. The deposit is calculated based on the payment plan and stored in the
     /// agreement.
     pub fn hold_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
-        self.consumer_deposit = self.calculate_consumer_deposit();
+        let deposit = self.calculate_consumer_deposit();
 
-        T::Currency::hold(
-            &HoldReason::ConsumerDeposit.into(),
-            &self.consumer,
-            self.consumer_deposit,
-        )?;
+        T::Currency::hold(&HoldReason::ConsumerDeposit.into(), &self.consumer, deposit)?;
 
-        Ok(self.consumer_deposit)
+        self.consumer_deposit = deposit;
+        Ok(deposit)
     }
 
     /// Releases the consumer deposit for the agreement. The deposit amount currently held is set to zero.
     pub fn release_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+        let deposit = self.consumer_deposit;
+
         T::Currency::release(
             &HoldReason::ConsumerDeposit.into(),
             &self.consumer,
-            self.consumer_deposit,
+            deposit,
             Exact,
         )?;
 
-        let deposit = self.consumer_deposit;
         self.consumer_deposit = BalanceOf::<T>::zero();
         Ok(deposit)
     }
@@ -255,7 +291,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
     ///
     /// Returns the amount of the installment.
     pub fn hold_next_installment(&mut self) -> Result<BalanceOf<T>, DispatchError> {
-        let installment_index = self.payment_history.len();
+        let installment_index = self.payment_history.records.len();
 
         // Last installment is already paid with the consumer deposit
         ensure!(
@@ -274,6 +310,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
         )?;
 
         self.payment_history
+            .records
             .try_push(PaymentRecord {
                 amount: installment_cost,
                 transferred: false,
@@ -282,6 +319,77 @@ impl<T: pallet::Config> AgreementDetails<T> {
             .expect("payment history should never exceed the payment plan");
 
         Ok(installment_cost)
+    }
+
+    /// Transfers due installments to the IP. The installments are transferred from the consumer
+    /// to the IP.
+    ///
+    /// Returns the total amount transferred.
+    pub fn transfer_installments(
+        &mut self,
+        block_number: BlockNumberFor<T>,
+    ) -> Result<BalanceOf<T>, DispatchError> {
+        let current_installment = self.payment_history.next_transfer_installment_index as usize;
+
+        // Calculate the total amount to be transferred and mark the installments as transferred
+        let (mut total, count) = self
+            .payment_history
+            .records
+            .iter_mut()
+            .zip(self.payment_plan.iter())
+            .skip(current_installment)
+            .take_while(|(record, end_block)| !record.transferred && **end_block < block_number)
+            .fold(
+                (BalanceOf::<T>::zero(), 0),
+                |(total, count), (record, _)| {
+                    record.transferred = true;
+                    (total.saturating_add(record.amount), count + 1)
+                },
+            );
+
+        T::Currency::transfer_on_hold(
+            &HoldReason::ConsumerInstallment.into(),
+            &self.consumer,
+            &self.ip,
+            total,
+            Exact,
+            Free,
+            Polite,
+        )?;
+
+        self.payment_history.next_transfer_installment_index += count;
+
+        // Check if the agreement is complete and transfer the consumer deposit to the IP if it is
+        if self.payment_plan.last() < Some(&block_number) {
+            T::Currency::transfer_on_hold(
+                &HoldReason::ConsumerDeposit.into(),
+                &self.consumer,
+                &self.ip,
+                self.consumer_deposit,
+                Exact,
+                Free,
+                Polite,
+            )?;
+
+            // Add the consumer deposit transfer to the payment history
+            self.payment_history
+                .records
+                .try_push(PaymentRecord {
+                    amount: self.consumer_deposit,
+                    transferred: true,
+                })
+                .map_err(|_| ())
+                .expect("payment history should never exceed the payment plan");
+
+            total = total.saturating_add(self.consumer_deposit);
+        }
+
+        Ok(total)
+    }
+
+    /// Checks if all the installments are transferred to the IP.
+    pub fn all_transfers_completed(&self) -> bool {
+        self.payment_history.records.len() == self.payment_plan.len()
     }
 }
 

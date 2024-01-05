@@ -1,5 +1,7 @@
 use frame_support::{
-    assert_ok, parameter_types,
+    assert_ok,
+    pallet_prelude::*,
+    parameter_types,
     traits::{ConstU32, ConstU64},
     PalletId,
 };
@@ -128,11 +130,13 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext
 }
 
-#[allow(dead_code)]
 pub fn run_to_block(n: u64) {
-    // TODO: Might need to trigger hooks too
     while System::block_number() < n {
+        if System::block_number() > 1 {
+            System::on_finalize(System::block_number());
+        }
         System::set_block_number(System::block_number() + 1);
+        System::on_initialize(System::block_number());
     }
 }
 

@@ -45,7 +45,7 @@ pub trait WeightInfo {
 	fn ip_propose_payment_plan() -> Weight;
 	fn consumer_accept_agreement() -> Weight;
 	fn consumer_prepay_installment() -> Weight;
-	fn withdraw_provider_funds() -> Weight;
+	fn ip_withdraw_installments() -> Weight;
 	fn submit_provider_feedback() -> Weight;	
 	fn submit_consumer_feedback() -> Weight;
 
@@ -155,7 +155,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
-	fn withdraw_provider_funds() -> Weight {
+	fn ip_withdraw_installments() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -299,7 +299,7 @@ impl WeightInfo for () {
 	}
 		/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
-	fn withdraw_provider_funds() -> Weight {
+	fn ip_withdraw_installments() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
