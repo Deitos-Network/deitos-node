@@ -139,7 +139,7 @@ fn test_consumer_prepay_multiple() {
         // Verify that consumer cannot prepay any more installments
         assert_noop!(
             Deitos::consumer_prepay_installment(RuntimeOrigin::signed(CONSUMER), agreement_id),
-            Error::<Test>::NoMoreInstallments
+            Error::<Test>::NoUnpaidInstallments
         );
     });
 }
@@ -277,7 +277,7 @@ fn test_ip_withdraw_completely() {
 
         // Verify that the agreement is correctly updated
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
-        assert!(stored_agreement.all_transfers_completed());
+        assert!(stored_agreement.consumer_deposit_transferred);
         assert_eq!(stored_agreement.status, AgreementStatus::Completed);
 
         // Verify that the IP's balance is properly updated
@@ -297,6 +297,59 @@ fn test_ip_withdraw_completely() {
         System::assert_has_event(RuntimeEvent::Deitos(Event::AgreementStatusChanged {
             agreement_id,
             status: AgreementStatus::Completed,
+        }));
+    });
+}
+
+#[test]
+fn test_ip_terminate_nonpay() {
+    new_test_ext().execute_with(|| {
+        let storage: StorageSizeMB = 100;
+        let activation_block: BlockNumberFor<Test> = 100;
+        let payment_plan: PaymentPlan<Test> = vec![
+            activation_block + 100,
+            activation_block + 300,
+            activation_block + 600,
+        ]
+        .try_into()
+        .unwrap();
+
+        register_and_activate_ip(IP, storage);
+        let agreement_id = create_accepted_agreement(
+            IP,
+            CONSUMER,
+            storage,
+            activation_block,
+            payment_plan.clone(),
+        );
+
+        // Consumer prepays the first installment
+        assert_ok!(Deitos::consumer_prepay_installment(
+            RuntimeOrigin::signed(CONSUMER),
+            agreement_id,
+        ));
+
+        let balance_before = Balances::free_balance(IP);
+
+        // IP terminates the agreement because the second installment is not prepaid
+        run_to_block(activation_block + 101);
+        assert_ok!(Deitos::ip_terminate_nonpay(
+            RuntimeOrigin::signed(IP),
+            agreement_id,
+        ));
+
+        // Verify that the agreement is removed
+        assert_eq!(Agreements::<Test>::get(agreement_id), None);
+
+        // Verify that the IP's balance is properly updated
+        let transferred = 400 * PRICE_STORAGE;
+        assert_eq!(Balances::free_balance(IP), balance_before + transferred);
+
+        // Check for the correct event emission
+        System::assert_has_event(RuntimeEvent::Deitos(Event::IPTerminatedNonPay {
+            agreement_id,
+            ip: IP,
+            transferred,
         }));
     });
 }

@@ -126,6 +126,7 @@ impl<T: pallet::Config> PaymentHistory<T> {
 /// - `ip` - the IP the agreement is with
 /// - `consumer` - the consumer the agreement is with
 /// - `consumer_deposit` - the deposit the consumer has payed to secure the agreement
+/// - `consumer_deposit_transferred` - flag indicating if the consumer deposit is transferred to the IP
 /// - `status` - the current status of the agreement
 /// - `storage` - the amount of storage covered by the agreement
 /// - `activation_block` - the block number when the rental starts
@@ -141,6 +142,8 @@ pub struct AgreementDetails<T: pallet::Config> {
     pub consumer: AccountIdOf<T>,
     /// Deposit amount currently held for the agreement from the consumer
     pub consumer_deposit: BalanceOf<T>,
+    /// Flag indicating if the consumer deposit is transferred to the IP
+    pub consumer_deposit_transferred: bool,
     /// Current status of the agreement
     pub status: AgreementStatus,
     /// The amount of storage covered by the agreement
@@ -211,6 +214,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
             ip,
             consumer,
             consumer_deposit: BalanceOf::<T>::zero(),
+            consumer_deposit_transferred: false,
             status: AgreementStatus::ConsumerRequest,
             storage,
             activation_block,
@@ -286,6 +290,24 @@ impl<T: pallet::Config> AgreementDetails<T> {
         Ok(new_deposit)
     }
 
+    /// Transfers the consumer deposit to the IP.
+    ///
+    /// Returns the amount of the consumer deposit.
+    pub fn transfer_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+        T::Currency::transfer_on_hold(
+            &HoldReason::ConsumerDeposit.into(),
+            &self.consumer,
+            &self.ip,
+            self.consumer_deposit,
+            Exact,
+            Free,
+            Polite,
+        )?;
+
+        self.consumer_deposit_transferred = true;
+        Ok(self.consumer_deposit)
+    }
+
     /// Holds the next installment for the agreement. The installment is calculated based on the
     /// payment plan and stored in the agreement's payment history.
     ///
@@ -296,12 +318,12 @@ impl<T: pallet::Config> AgreementDetails<T> {
         // Last installment is already paid with the consumer deposit
         ensure!(
             installment_index < self.payment_plan.len() - 1,
-            Error::<T>::NoMoreInstallments
+            Error::<T>::NoUnpaidInstallments
         );
 
         let installment_cost = self
             .calculate_installment_cost(installment_index)
-            .ok_or(Error::<T>::NoMoreInstallments)?;
+            .ok_or(Error::<T>::NoUnpaidInstallments)?;
 
         T::Currency::hold(
             &HoldReason::ConsumerInstallment.into(),
@@ -361,35 +383,22 @@ impl<T: pallet::Config> AgreementDetails<T> {
 
         // Check if the agreement is complete and transfer the consumer deposit to the IP if it is
         if self.payment_plan.last() < Some(&block_number) {
-            T::Currency::transfer_on_hold(
-                &HoldReason::ConsumerDeposit.into(),
-                &self.consumer,
-                &self.ip,
-                self.consumer_deposit,
-                Exact,
-                Free,
-                Polite,
-            )?;
-
-            // Add the consumer deposit transfer to the payment history
-            self.payment_history
-                .records
-                .try_push(PaymentRecord {
-                    amount: self.consumer_deposit,
-                    transferred: true,
-                })
-                .map_err(|_| ())
-                .expect("payment history should never exceed the payment plan");
-
-            total = total.saturating_add(self.consumer_deposit);
+            let deposit = self.transfer_consumer_deposit()?;
+            total = total.saturating_add(deposit);
         }
 
         Ok(total)
     }
 
-    /// Checks if all the installments are transferred to the IP.
-    pub fn all_transfers_completed(&self) -> bool {
-        self.payment_history.records.len() == self.payment_plan.len()
+    /// Checks if there are any overdue installments. An installment is overdue if it is not
+    /// prepaid by the consumer before the start of the installment. The last installment is
+    /// always prepaid by the consumer deposit.
+    pub fn has_overdue_installments(&self, block_number: BlockNumberFor<T>) -> bool {
+        let next_unpaid_installment = self.payment_history.records.len();
+
+        next_unpaid_installment < self.payment_plan.len() - 1
+            && ((next_unpaid_installment == 0 && block_number >= self.activation_block)
+                || (block_number > self.payment_plan[next_unpaid_installment - 1]))
     }
 }
 
