@@ -118,7 +118,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .unwrap();
 
     pallet_deitos::GenesisConfig::<Test> {
-        initial_ip_deposit: IP_INITIAL_DEPOSIT,
+        ip_initial_deposit: IP_INITIAL_DEPOSIT,
         price_storage_mb_per_block: PRICE_STORAGE,
     }
     .assimilate_storage(&mut t)

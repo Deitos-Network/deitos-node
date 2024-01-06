@@ -123,7 +123,7 @@ pub mod pallet {
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
         /// The amount of initial deposit for IP registration
-        pub initial_ip_deposit: BalanceOf<T>,
+        pub ip_initial_deposit: BalanceOf<T>,
         /// The price for storage of 1 MB per block
         pub price_storage_mb_per_block: BalanceOf<T>,
     }
@@ -131,7 +131,7 @@ pub mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            IPDepositAmount::<T>::put(self.initial_ip_deposit);
+            IPDepositAmount::<T>::put(self.ip_initial_deposit);
             CurrentPrices::<T>::put(Prices {
                 storage_mb_per_block: self.price_storage_mb_per_block,
             });
