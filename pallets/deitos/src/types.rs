@@ -263,10 +263,10 @@ impl<T: pallet::Config> AgreementDetails<T> {
         Ok(deposit.saturating_add(service_deposit))
     }
 
-    /// Releases the consumer deposit for the agreement. The deposit amount currently held is set to zero.
-    pub fn release_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+    /// Releases the consumer security and service deposits for the agreement.
+    /// The deposit amount currently held is set to zero.
+    pub fn release_consumer_deposits(&mut self) -> Result<BalanceOf<T>, DispatchError> {
         let deposit = self.consumer_security_deposit;
-
         T::Currency::release(
             &HoldReason::ConsumerSecurityDeposit.into(),
             &self.consumer,
@@ -274,17 +274,26 @@ impl<T: pallet::Config> AgreementDetails<T> {
             Exact,
         )?;
 
+        let service_deposit = self.consumer_service_deposit;
+        T::Currency::release(
+            &HoldReason::ConsumerServiceDeposit.into(),
+            &self.consumer,
+            service_deposit,
+            Exact,
+        )?;
+
         self.consumer_security_deposit = BalanceOf::<T>::zero();
-        Ok(deposit)
+        self.consumer_service_deposit = BalanceOf::<T>::zero();
+        Ok(deposit.saturating_add(service_deposit))
     }
 
-    /// Adjusts the consumer deposit for the agreement. This is called when the payment plan is
+    /// Adjusts the consumer security deposit for the agreement. This is called when the payment plan is
     /// changed. The deposit amount currently held is adjusted to the new deposit amount.
     /// The new deposit amount is calculated based on the new payment plan and stored in the
     /// agreement.
     ///
-    /// Returns the new deposit amount.
-    pub fn adjust_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+    /// Returns the new security deposit amount.
+    pub fn adjust_consumer_security_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
         let current_deposit = self.consumer_security_deposit;
         let new_deposit = self.calculate_consumer_deposit();
 
@@ -308,10 +317,10 @@ impl<T: pallet::Config> AgreementDetails<T> {
         Ok(new_deposit)
     }
 
-    /// Transfers the consumer deposit to the IP.
+    /// Transfers the consumer security deposit to the IP.
     ///
-    /// Returns the amount of the consumer deposit.
-    pub fn transfer_consumer_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+    /// Returns the amount transferred.
+    pub fn transfer_consumer_security_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
         T::Currency::transfer_on_hold(
             &HoldReason::ConsumerSecurityDeposit.into(),
             &self.consumer,
@@ -401,7 +410,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
 
         // Check if the agreement is complete and transfer the consumer deposit to the IP if it is
         if self.payment_plan.last() < Some(&block_number) {
-            let deposit = self.transfer_consumer_deposit()?;
+            let deposit = self.transfer_consumer_security_deposit()?;
             total = total.saturating_add(deposit);
         }
 

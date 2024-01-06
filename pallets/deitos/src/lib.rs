@@ -250,8 +250,8 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer revoking the agreement
             consumer: T::AccountId,
-            /// The deposit released
-            consumer_deposit: BalanceOf<T>,
+            /// The total deposit released
+            consumer_total_deposit: BalanceOf<T>,
         },
         /// An IP has accepted an agreement
         IPAcceptedAgreement {
@@ -281,10 +281,10 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer accepting the agreement
             consumer: T::AccountId,
-            /// The previously held deposit, which is released now
-            consumer_deposit_released: BalanceOf<T>,
-            /// The new deposit, which is held now
-            consumer_deposit_held: BalanceOf<T>,
+            /// The previously held security deposit, which is released now
+            consumer_security_deposit_released: BalanceOf<T>,
+            /// The new security deposit, which is held now
+            consumer_security_deposit_held: BalanceOf<T>,
         },
         /// A consumer has prepaid an installment
         ConsumerPrepaidInstallment {
@@ -576,7 +576,7 @@ pub mod pallet {
                 Error::<T>::AgreementInProgress
             );
 
-            let consumer_deposit = agreement.release_consumer_deposit()?;
+            let consumer_total_deposit = agreement.release_consumer_deposits()?;
 
             Self::delete_agreement(agreement_id)?;
 
@@ -584,7 +584,7 @@ pub mod pallet {
                 agreement_id,
                 ip: agreement.ip,
                 consumer,
-                consumer_deposit,
+                consumer_total_deposit,
             })
         }
 
@@ -687,7 +687,7 @@ pub mod pallet {
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
 
-            let (ip, consumer_deposit_released, consumer_deposit_held) =
+            let (ip, consumer_security_deposit_released, consumer_security_deposit_held) =
                 Agreements::<T>::try_mutate(
                     agreement_id,
                     |agreement| -> Result<_, DispatchError> {
@@ -706,7 +706,7 @@ pub mod pallet {
                         );
 
                         let old_deposit = agreement.consumer_security_deposit;
-                        let new_deposit = agreement.adjust_consumer_deposit()?;
+                        let new_deposit = agreement.adjust_consumer_security_deposit()?;
 
                         agreement.update_status(agreement_id, AgreementStatus::Active);
                         Ok((agreement.ip.clone(), old_deposit, new_deposit))
@@ -717,8 +717,8 @@ pub mod pallet {
                 agreement_id,
                 ip,
                 consumer,
-                consumer_deposit_released,
-                consumer_deposit_held,
+                consumer_security_deposit_released,
+                consumer_security_deposit_held,
             })
         }
 
@@ -833,7 +833,7 @@ pub mod pallet {
                 .has_overdue_installments(current_block_number)
                 .then(|| -> Result<_, DispatchError> {
                     let total = agreement.transfer_installments(current_block_number)?;
-                    let deposit = agreement.transfer_consumer_deposit()?;
+                    let deposit = agreement.transfer_consumer_security_deposit()?;
                     Self::delete_agreement(agreement_id)?;
 
                     Ok(total.saturating_add(deposit))

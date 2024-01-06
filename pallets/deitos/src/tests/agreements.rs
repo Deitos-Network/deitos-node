@@ -197,8 +197,8 @@ fn test_consumer_accept_agreement() {
             agreement_id,
             ip: IP,
             consumer: CONSUMER,
-            consumer_deposit_released: initial_consumer_deposit,
-            consumer_deposit_held: expected_consumer_deposit,
+            consumer_security_deposit_released: initial_consumer_deposit,
+            consumer_security_deposit_held: expected_consumer_deposit,
         }));
     });
 }
@@ -268,7 +268,7 @@ fn test_consumer_reject_proposal() {
             agreement_id,
             ip: IP,
             consumer: CONSUMER,
-            consumer_deposit,
+            consumer_total_deposit: consumer_deposit + CONSUMER_SERVICE_DEPOSIT,
         }));
     });
 }
