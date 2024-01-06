@@ -111,11 +111,14 @@ pub mod pallet {
         /// Initial deposit for IP registration
         #[codec(index = 0)]
         IPInitialDeposit,
-        /// Consumer deposit for securing an agreement
+        /// Consumer service deposit
         #[codec(index = 1)]
+        ConsumerServiceDeposit,
+        /// Consumer deposit for securing an agreement
+        #[codec(index = 2)]
         ConsumerSecurityDeposit,
         /// Consumer installment payment
-        #[codec(index = 2)]
+        #[codec(index = 3)]
         ConsumerInstallment,
     }
 
@@ -230,8 +233,8 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer requesting the agreement
             consumer: T::AccountId,
-            /// The deposit the consumer has payed to secure the agreement
-            consumer_deposit: BalanceOf<T>,
+            /// The total deposit the consumer has payed
+            consumer_total_deposit: BalanceOf<T>,
             /// The amount of storage covered by the agreement
             storage: StorageSizeMB,
             /// The block number when the rental starts
@@ -493,6 +496,7 @@ pub mod pallet {
             payment_plan: PaymentPlan<T>,
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
+
             // Activation block must be in the future
             ensure!(
                 activation_block > Self::current_block_number(),
@@ -529,7 +533,8 @@ pub mod pallet {
                 payment_plan.clone(),
             );
 
-            let consumer_deposit = agreement.hold_consumer_deposit()?;
+            let consumer_total_deposit =
+                agreement.hold_consumer_deposits(Self::consumer_service_deposit_amount())?;
 
             let agreement_id = Self::insert_agreement(agreement)?;
 
@@ -537,7 +542,7 @@ pub mod pallet {
                 agreement_id,
                 ip,
                 consumer,
-                consumer_deposit,
+                consumer_total_deposit,
                 storage,
                 activation_block,
                 payment_plan,

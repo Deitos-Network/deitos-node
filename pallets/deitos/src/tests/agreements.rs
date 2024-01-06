@@ -55,7 +55,7 @@ fn test_consumer_request_agreement() {
         // Assert: Verify that the consumer's balance is properly updated
         assert_eq!(
             Balances::free_balance(CONSUMER),
-            INITIAL_BALANCE - expected_consumer_deposit
+            INITIAL_BALANCE - expected_consumer_deposit - CONSUMER_SERVICE_DEPOSIT
         );
 
         assert_eq!(
@@ -66,12 +66,20 @@ fn test_consumer_request_agreement() {
             expected_consumer_deposit
         );
 
+        assert_eq!(
+            <Balances as fungible::InspectHold<_>>::balance_on_hold(
+                &HoldReason::ConsumerServiceDeposit.into(),
+                &CONSUMER
+            ),
+            CONSUMER_SERVICE_DEPOSIT
+        );
+
         // Assert: Check for the correct event emission
         System::assert_has_event(RuntimeEvent::Deitos(Event::ConsumerRequestedAgreement {
             agreement_id: expected_agreement_id,
             ip: IP,
             consumer: CONSUMER,
-            consumer_deposit: expected_consumer_deposit,
+            consumer_total_deposit: expected_consumer_deposit + CONSUMER_SERVICE_DEPOSIT,
             storage,
             activation_block,
             payment_plan,
@@ -160,6 +168,10 @@ fn test_consumer_accept_agreement() {
         let expected_consumer_deposit = 200 * PRICE_STORAGE; // Length of last installment * price per block
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
         assert_eq!(
+            stored_agreement.consumer_service_deposit,
+            CONSUMER_SERVICE_DEPOSIT
+        );
+        assert_eq!(
             stored_agreement.consumer_security_deposit,
             expected_consumer_deposit
         );
@@ -169,7 +181,7 @@ fn test_consumer_accept_agreement() {
         // Verify that the consumer's balance is properly updated
         assert_eq!(
             Balances::free_balance(CONSUMER),
-            INITIAL_BALANCE - expected_consumer_deposit
+            INITIAL_BALANCE - expected_consumer_deposit - CONSUMER_SERVICE_DEPOSIT
         );
 
         assert_eq!(
@@ -192,7 +204,7 @@ fn test_consumer_accept_agreement() {
 }
 
 #[test]
-fn consumer_reject_proposal() {
+fn test_consumer_reject_proposal() {
     new_test_ext().execute_with(|| {
         let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
