@@ -63,6 +63,9 @@ pub mod pallet {
         /// The overarching runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
+        /// A type representing the weights required by the dispatchables of this pallet.
+        type WeightInfo: WeightInfo;
+
         /// The fungible used for deposits.
         type Currency: FunHoldMutate<Self::AccountId, Reason = Self::RuntimeHoldReason>
             + FunInspect<Self::AccountId>
@@ -72,9 +75,6 @@ pub mod pallet {
 
         /// Overarching hold reason.
         type RuntimeHoldReason: From<HoldReason>;
-
-        /// A type representing the weights required by the dispatchables of this pallet.
-        type WeightInfo: WeightInfo;
 
         /// Agreement Id type
         type AgreementId: Member
@@ -124,8 +124,8 @@ pub mod pallet {
     pub struct GenesisConfig<T: Config> {
         /// The amount of initial deposit for IP registration
         pub initial_ip_deposit: BalanceOf<T>,
-        /// The initial price for storage of 1 MB per block
-        pub initial_price_storage_mb_per_block: BalanceOf<T>,
+        /// The price for storage of 1 MB per block
+        pub price_storage_mb_per_block: BalanceOf<T>,
     }
 
     #[pallet::genesis_build]
@@ -133,7 +133,7 @@ pub mod pallet {
         fn build(&self) {
             IPDepositAmount::<T>::put(self.initial_ip_deposit);
             CurrentPrices::<T>::put(Prices {
-                storage_mb_per_block: self.initial_price_storage_mb_per_block,
+                storage_mb_per_block: self.price_storage_mb_per_block,
             });
         }
     }
