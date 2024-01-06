@@ -113,7 +113,7 @@ pub mod pallet {
         IPInitialDeposit,
         /// Consumer deposit for securing an agreement
         #[codec(index = 1)]
-        ConsumerDeposit,
+        ConsumerSecurityDeposit,
         /// Consumer installment payment
         #[codec(index = 2)]
         ConsumerInstallment,
@@ -700,7 +700,7 @@ pub mod pallet {
                             Error::<T>::AgreementStatusInvalid
                         );
 
-                        let old_deposit = agreement.consumer_deposit;
+                        let old_deposit = agreement.consumer_security_deposit;
                         let new_deposit = agreement.adjust_consumer_deposit()?;
 
                         agreement.update_status(agreement_id, AgreementStatus::Active);
@@ -786,7 +786,7 @@ pub mod pallet {
                     let transferred = agreement.transfer_installments(current_block_number)?;
 
                     // Check if all installments have been withdrawn
-                    if agreement.consumer_deposit_transferred {
+                    if agreement.consumer_security_deposit_transferred {
                         agreement.update_status(agreement_id, AgreementStatus::Completed);
                     }
 

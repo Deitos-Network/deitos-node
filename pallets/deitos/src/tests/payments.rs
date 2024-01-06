@@ -277,7 +277,7 @@ fn test_ip_withdraw_completely() {
 
         // Verify that the agreement is correctly updated
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
-        assert!(stored_agreement.consumer_deposit_transferred);
+        assert!(stored_agreement.consumer_security_deposit_transferred);
         assert_eq!(stored_agreement.status, AgreementStatus::Completed);
 
         // Verify that the IP's balance is properly updated
