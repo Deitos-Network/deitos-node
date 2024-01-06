@@ -40,6 +40,7 @@ type Balance = u64;
 type AgreementId = u32;
 
 pub const IP_INITIAL_DEPOSIT: Balance = 1_000_000;
+pub const CONSUMER_SERVICE_DEPOSIT: Balance = 1_000;
 pub const PRICE_STORAGE: Balance = 10;
 pub const INITIAL_BALANCE: Balance = 1_000_000_000;
 pub const IP: AccountId = 1;
@@ -90,9 +91,9 @@ impl pallet_balances::Config for Test {
 
 impl pallet_deitos::Config for Test {
     type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = ();
     type Currency = Balances;
     type RuntimeHoldReason = RuntimeHoldReason;
-    type WeightInfo = ();
     type AgreementId = AgreementId;
     type PaymentPlanLimit = ConstU32<500>;
     type IPAgreementsLimit = ConstU32<500>;
@@ -119,6 +120,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     pallet_deitos::GenesisConfig::<Test> {
         ip_initial_deposit: IP_INITIAL_DEPOSIT,
+        consumer_service_deposit: CONSUMER_SERVICE_DEPOSIT,
         price_storage_mb_per_block: PRICE_STORAGE,
     }
     .assimilate_storage(&mut t)

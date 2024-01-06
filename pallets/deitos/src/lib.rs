@@ -124,6 +124,8 @@ pub mod pallet {
     pub struct GenesisConfig<T: Config> {
         /// The amount of initial deposit for IP registration
         pub ip_initial_deposit: BalanceOf<T>,
+        /// The amount of service deposit for consumer
+        pub consumer_service_deposit: BalanceOf<T>,
         /// The price for storage of 1 MB per block
         pub price_storage_mb_per_block: BalanceOf<T>,
     }
@@ -132,6 +134,7 @@ pub mod pallet {
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
             IPDepositAmount::<T>::put(self.ip_initial_deposit);
+            ConsumerServiceDepositAmount::<T>::put(self.consumer_service_deposit);
             CurrentPrices::<T>::put(Prices {
                 storage_mb_per_block: self.price_storage_mb_per_block,
             });
@@ -142,6 +145,11 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn ip_deposit_amount)]
     pub type IPDepositAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+    /// The amount of service deposit for consumer
+    #[pallet::storage]
+    #[pallet::getter(fn consumer_service_deposit_amount)]
+    pub type ConsumerServiceDepositAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
     /// Prices defined by the protocol
     #[pallet::storage]
