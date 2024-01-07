@@ -41,8 +41,8 @@ use frame_support::{
     },
     PalletId,
 };
-pub use log;
-pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::prelude::string::String;
 use sp_runtime::{
     traits::{One, Saturating, StaticLookup, Zero},
     BoundedVec, SaturatedConversion,
@@ -79,6 +79,9 @@ pub mod pallet {
         /// The overarching runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
+        /// A type representing the weights required by the dispatchables of this pallet.
+        type WeightInfo: WeightInfo;
+
         /// The fungible used for deposits.
         type Currency: FunHoldMutate<Self::AccountId, Reason = Self::RuntimeHoldReason>
             + FunInspect<Self::AccountId>
@@ -88,9 +91,6 @@ pub mod pallet {
 
         /// Overarching hold reason.
         type RuntimeHoldReason: From<HoldReason>;
-
-        /// A type representing the weights required by the dispatchables of this pallet.
-        type WeightInfo: WeightInfo;
 
         /// Agreement Id type
         type AgreementId: Member
@@ -127,11 +127,14 @@ pub mod pallet {
         /// Initial deposit for IP registration
         #[codec(index = 0)]
         IPInitialDeposit,
-        /// Consumer deposit for securing an agreement
+        /// Consumer service deposit
         #[codec(index = 1)]
-        ConsumerDeposit,
-        /// Consumer installment payment
+        ConsumerServiceDeposit,
+        /// Consumer deposit for securing an agreement
         #[codec(index = 2)]
+        ConsumerSecurityDeposit,
+        /// Consumer installment payment
+        #[codec(index = 3)]
         ConsumerInstallment,
     }
 
@@ -139,17 +142,20 @@ pub mod pallet {
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
         /// The amount of initial deposit for IP registration
-        pub initial_ip_deposit: BalanceOf<T>,
-        /// The initial price for storage of 1 MB per block
-        pub initial_price_storage_mb_per_block: BalanceOf<T>,
+        pub ip_initial_deposit: BalanceOf<T>,
+        /// The amount of service deposit for consumer
+        pub consumer_service_deposit: BalanceOf<T>,
+        /// The price for storage of 1 MB per block
+        pub price_storage_mb_per_block: BalanceOf<T>,
     }
 
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            IPDepositAmount::<T>::put(self.initial_ip_deposit);
+            IPDepositAmount::<T>::put(self.ip_initial_deposit);
+            ConsumerServiceDepositAmount::<T>::put(self.consumer_service_deposit);
             CurrentPrices::<T>::put(Prices {
-                storage_mb_per_block: self.initial_price_storage_mb_per_block,
+                storage_mb_per_block: self.price_storage_mb_per_block,
             });
         }
     }
@@ -158,6 +164,11 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn ip_deposit_amount)]
     pub type IPDepositAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+    /// The amount of service deposit for consumer
+    #[pallet::storage]
+    #[pallet::getter(fn consumer_service_deposit_amount)]
+    pub type ConsumerServiceDepositAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
     /// Prices defined by the protocol
     #[pallet::storage]
@@ -238,8 +249,8 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer requesting the agreement
             consumer: T::AccountId,
-            /// The deposit the consumer has payed to secure the agreement
-            consumer_deposit: BalanceOf<T>,
+            /// The total deposit the consumer has payed
+            consumer_total_deposit: BalanceOf<T>,
             /// The amount of storage covered by the agreement
             storage: StorageSizeMB,
             /// The block number when the rental starts
@@ -255,8 +266,8 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer revoking the agreement
             consumer: T::AccountId,
-            /// The deposit released
-            consumer_deposit: BalanceOf<T>,
+            /// The total deposit released
+            consumer_total_deposit: BalanceOf<T>,
         },
         /// An IP has accepted an agreement
         IPAcceptedAgreement {
@@ -286,10 +297,10 @@ pub mod pallet {
             ip: T::AccountId,
             /// The consumer accepting the agreement
             consumer: T::AccountId,
-            /// The previously held deposit, which is released now
-            consumer_deposit_released: BalanceOf<T>,
-            /// The new deposit, which is held now
-            consumer_deposit_held: BalanceOf<T>,
+            /// The previously held security deposit, which is released now
+            consumer_security_deposit_released: BalanceOf<T>,
+            /// The new security deposit, which is held now
+            consumer_security_deposit_held: BalanceOf<T>,
         },
         /// A consumer has prepaid an installment
         ConsumerPrepaidInstallment {
@@ -317,6 +328,19 @@ pub mod pallet {
             ip: T::AccountId,
             /// The total amount transferred to the IP
             transferred: BalanceOf<T>,
+        },
+        /// A consumer has submitted feedback
+        ConsumerSubmittedFeedback {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The consumer submitting the feedback
+            consumer: T::AccountId,
+            /// The IP the agreement is with
+            ip: T::AccountId,
+            /// The score of the feedback
+            score: Score,
+            /// The comment of the feedback
+            comment: String,
         },
     }
 
@@ -376,13 +400,7 @@ pub mod pallet {
                 Self::ip_deposit_amount(),
             )?;
 
-            let ip_details = IPDetails::<T> {
-                total_storage,
-                status: IPStatus::Pending,
-                agreements: BoundedVec::new(),
-                deposit: Self::ip_deposit_amount(),
-            };
-
+            let ip_details = IPDetails::new(total_storage, Self::ip_deposit_amount());
             InfrastructureProviders::<T>::insert(&ip, ip_details);
 
             Self::deposit_event(Event::IPRegistered { ip, total_storage });
@@ -501,6 +519,7 @@ pub mod pallet {
             payment_plan: PaymentPlan<T>,
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
+
             // Activation block must be in the future
             ensure!(
                 activation_block > Self::current_block_number(),
@@ -537,7 +556,8 @@ pub mod pallet {
                 payment_plan.clone(),
             );
 
-            let consumer_deposit = agreement.hold_consumer_deposit()?;
+            let consumer_total_deposit =
+                agreement.hold_consumer_deposits(Self::consumer_service_deposit_amount())?;
 
             let agreement_id = Self::insert_agreement(agreement)?;
 
@@ -545,7 +565,7 @@ pub mod pallet {
                 agreement_id,
                 ip,
                 consumer,
-                consumer_deposit,
+                consumer_total_deposit,
                 storage,
                 activation_block,
                 payment_plan,
@@ -579,7 +599,7 @@ pub mod pallet {
                 Error::<T>::AgreementInProgress
             );
 
-            let consumer_deposit = agreement.release_consumer_deposit()?;
+            let consumer_total_deposit = agreement.release_consumer_deposits()?;
 
             Self::delete_agreement(agreement_id)?;
 
@@ -587,7 +607,7 @@ pub mod pallet {
                 agreement_id,
                 ip: agreement.ip,
                 consumer,
-                consumer_deposit,
+                consumer_total_deposit,
             })
         }
 
@@ -690,7 +710,7 @@ pub mod pallet {
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
 
-            let (ip, consumer_deposit_released, consumer_deposit_held) =
+            let (ip, consumer_security_deposit_released, consumer_security_deposit_held) =
                 Agreements::<T>::try_mutate(
                     agreement_id,
                     |agreement| -> Result<_, DispatchError> {
@@ -708,8 +728,8 @@ pub mod pallet {
                             Error::<T>::AgreementStatusInvalid
                         );
 
-                        let old_deposit = agreement.consumer_deposit;
-                        let new_deposit = agreement.adjust_consumer_deposit()?;
+                        let old_deposit = agreement.consumer_security_deposit;
+                        let new_deposit = agreement.adjust_consumer_security_deposit()?;
 
                         agreement.update_status(agreement_id, AgreementStatus::Active);
                         Ok((agreement.ip.clone(), old_deposit, new_deposit))
@@ -720,8 +740,8 @@ pub mod pallet {
                 agreement_id,
                 ip,
                 consumer,
-                consumer_deposit_released,
-                consumer_deposit_held,
+                consumer_security_deposit_released,
+                consumer_security_deposit_held,
             })
         }
 
@@ -794,7 +814,7 @@ pub mod pallet {
                     let transferred = agreement.transfer_installments(current_block_number)?;
 
                     // Check if all installments have been withdrawn
-                    if agreement.consumer_deposit_transferred {
+                    if agreement.consumer_security_deposit_transferred {
                         agreement.update_status(agreement_id, AgreementStatus::Completed);
                     }
 
@@ -835,11 +855,14 @@ pub mod pallet {
             let transferred = agreement
                 .has_overdue_installments(current_block_number)
                 .then(|| -> Result<_, DispatchError> {
-                    let total = agreement.transfer_installments(current_block_number)?;
-                    let deposit = agreement.transfer_consumer_deposit()?;
+                    let installments = agreement.transfer_installments(current_block_number)?;
+                    let security_deposit = agreement.transfer_consumer_security_deposit()?;
+                    let service_deposit = agreement.transfer_consumer_service_deposit()?;
                     Self::delete_agreement(agreement_id)?;
 
-                    Ok(total.saturating_add(deposit))
+                    Ok(installments
+                        .saturating_add(security_deposit)
+                        .saturating_add(service_deposit))
                 })
                 .ok_or(Error::<T>::NoUnpaidInstallments)??;
 
@@ -850,18 +873,50 @@ pub mod pallet {
             })
         }
 
-        /// UNDER CONSTRUCTION
+        /// Submit feedback for an agreement. The agreement status must be `Completed`. The consumer
+        /// submits a score and a comment. The completed agreement is deleted. The consumer service
+        /// deposit is released.
         #[pallet::call_index(13)]
-        #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
-        pub fn submit_consumer_feedback(
+        #[pallet::weight(T::WeightInfo::consumer_submit_feedback())]
+        pub fn consumer_submit_feedback(
             origin: OriginFor<T>,
-            _ip: AccountIdLookupOf<T>,
-            _agreement_id: T::AgreementId,
+            agreement_id: T::AgreementId,
+            score: Score,
+            comment: String,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let _who = ensure_signed(origin)?;
+            let consumer = ensure_signed(origin)?;
 
-            Ok(())
+            let mut agreement =
+                Agreements::<T>::get(agreement_id).ok_or(Error::<T>::AgreementNotFound)?;
+
+            // Check that the transaction was signed by the consumer
+            ensure!(
+                agreement.consumer == consumer,
+                Error::<T>::AgreementNotFound
+            );
+
+            // Check that the agreement is completed
+            ensure!(
+                agreement.status == AgreementStatus::Completed,
+                Error::<T>::AgreementStatusInvalid
+            );
+
+            //Save the score. The IP must exist.
+            InfrastructureProviders::<T>::mutate(&agreement.ip, |ip_details| {
+                ip_details.as_mut().map(|x| x.add_score(score))
+            });
+
+            agreement.release_consumer_deposits()?;
+
+            Self::delete_agreement(agreement_id)?;
+
+            Self::success_event(Event::ConsumerSubmittedFeedback {
+                agreement_id,
+                consumer,
+                ip: agreement.ip,
+                score,
+                comment,
+            })
         }
     }
 }

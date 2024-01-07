@@ -51,7 +51,10 @@ fn test_consumer_request_agreement() {
         let expected_consumer_deposit = 100 * PRICE_STORAGE; // Length of last installment * price per block
         assert_eq!(stored_agreement.ip, IP);
         assert_eq!(stored_agreement.consumer, CONSUMER);
-        assert_eq!(stored_agreement.consumer_deposit, expected_consumer_deposit);
+        assert_eq!(
+            stored_agreement.consumer_security_deposit,
+            expected_consumer_deposit
+        );
         assert_eq!(stored_agreement.status, AgreementStatus::ConsumerRequest);
         assert_eq!(stored_agreement.storage, storage);
         assert_eq!(stored_agreement.activation_block, activation_block);
@@ -68,15 +71,23 @@ fn test_consumer_request_agreement() {
         // Assert: Verify that the consumer's balance is properly updated
         assert_eq!(
             Balances::free_balance(CONSUMER),
-            INITIAL_BALANCE - expected_consumer_deposit
+            INITIAL_BALANCE - expected_consumer_deposit - CONSUMER_SERVICE_DEPOSIT
         );
 
         assert_eq!(
             <Balances as fungible::InspectHold<_>>::balance_on_hold(
-                &HoldReason::ConsumerDeposit.into(),
+                &HoldReason::ConsumerSecurityDeposit.into(),
                 &CONSUMER
             ),
             expected_consumer_deposit
+        );
+
+        assert_eq!(
+            <Balances as fungible::InspectHold<_>>::balance_on_hold(
+                &HoldReason::ConsumerServiceDeposit.into(),
+                &CONSUMER
+            ),
+            CONSUMER_SERVICE_DEPOSIT
         );
 
         // Assert: Check for the correct event emission
@@ -84,7 +95,7 @@ fn test_consumer_request_agreement() {
             agreement_id: expected_agreement_id,
             ip: IP,
             consumer: CONSUMER,
-            consumer_deposit: expected_consumer_deposit,
+            consumer_total_deposit: expected_consumer_deposit + CONSUMER_SERVICE_DEPOSIT,
             storage,
             activation_block,
             payment_plan,
@@ -172,19 +183,26 @@ fn test_consumer_accept_agreement() {
         // Verify that the agreement is correctly updated
         let expected_consumer_deposit = 200 * PRICE_STORAGE; // Length of last installment * price per block
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
-        assert_eq!(stored_agreement.consumer_deposit, expected_consumer_deposit);
+        assert_eq!(
+            stored_agreement.consumer_service_deposit,
+            CONSUMER_SERVICE_DEPOSIT
+        );
+        assert_eq!(
+            stored_agreement.consumer_security_deposit,
+            expected_consumer_deposit
+        );
         assert_eq!(stored_agreement.status, AgreementStatus::Active);
         assert_eq!(stored_agreement.payment_plan, new_payment_plan);
 
         // Verify that the consumer's balance is properly updated
         assert_eq!(
             Balances::free_balance(CONSUMER),
-            INITIAL_BALANCE - expected_consumer_deposit
+            INITIAL_BALANCE - expected_consumer_deposit - CONSUMER_SERVICE_DEPOSIT
         );
 
         assert_eq!(
             <Balances as fungible::InspectHold<_>>::balance_on_hold(
-                &HoldReason::ConsumerDeposit.into(),
+                &HoldReason::ConsumerSecurityDeposit.into(),
                 &CONSUMER
             ),
             expected_consumer_deposit
@@ -195,14 +213,14 @@ fn test_consumer_accept_agreement() {
             agreement_id,
             ip: IP,
             consumer: CONSUMER,
-            consumer_deposit_released: initial_consumer_deposit,
-            consumer_deposit_held: expected_consumer_deposit,
+            consumer_security_deposit_released: initial_consumer_deposit,
+            consumer_security_deposit_held: expected_consumer_deposit,
         }));
     });
 }
 
 #[test]
-fn consumer_reject_proposal() {
+fn test_consumer_reject_proposal() {
     new_test_ext().execute_with(|| {
         let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
@@ -255,7 +273,7 @@ fn consumer_reject_proposal() {
 
         assert_eq!(
             <Balances as fungible::InspectHold<_>>::balance_on_hold(
-                &HoldReason::ConsumerDeposit.into(),
+                &HoldReason::ConsumerSecurityDeposit.into(),
                 &CONSUMER
             ),
             0
@@ -266,7 +284,7 @@ fn consumer_reject_proposal() {
             agreement_id,
             ip: IP,
             consumer: CONSUMER,
-            consumer_deposit,
+            consumer_total_deposit: consumer_deposit + CONSUMER_SERVICE_DEPOSIT,
         }));
     });
 }
