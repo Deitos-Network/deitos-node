@@ -901,16 +901,10 @@ pub mod pallet {
                 Error::<T>::AgreementStatusInvalid
             );
 
-            //Save score
-            InfrastructureProviders::<T>::try_mutate(
-                &agreement.ip,
-                |ip_details| -> Result<_, DispatchError> {
-                    let ip_details = ip_details.as_mut().ok_or(Error::<T>::IPNotFound)?;
-
-                    ip_details.add_score(score);
-                    Ok(())
-                },
-            )?;
+            //Save the score. The IP must exist.
+            InfrastructureProviders::<T>::mutate(&agreement.ip, |ip_details| {
+                ip_details.as_mut().map(|x| x.add_score(score))
+            });
 
             agreement.release_consumer_deposits()?;
 
