@@ -48,6 +48,79 @@ pub enum IPStatus {
     Unregistered,
 }
 
+/// The score used to for ranking. The score is a number between 0 and 4.
+#[repr(u8)]
+#[derive(Copy, Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
+pub enum Score {
+    /// Zero. Lowest score.
+    Zero = 0,
+    /// One.
+    One = 1,
+    /// Two.
+    Two = 2,
+    /// Three.
+    Three = 3,
+    /// Four. Highest score.
+    Four = 4,
+}
+
+/// The rating statistics. It has:
+/// - `cumulative_score` - the cumulative score is a sum of all the scores given
+/// - `number_of_ratings` - the number of all the scores given
+#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+pub struct Rating {
+    /// Cumulative score
+    pub cumulative_score: u32,
+    /// Number of ratings
+    pub number_of_ratings: u32,
+}
+
+/// The details of an IP. The IP has:
+/// - `total_storage` - the total storage the IP has
+/// - `status` - the current status of the IP
+/// - `agreements` - the vector of all the agreements for this IP
+/// - `deposit` - the deposit the IP has payed during the registration process
+/// - `rating` - the rating of the IP
+#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+#[codec(mel_bound(T: pallet::Config))]
+pub struct IPDetails<T: pallet::Config> {
+    /// Total IP storage
+    pub total_storage: StorageSizeMB,
+    /// IP Status
+    pub status: IPStatus,
+    /// Track of active agreements
+    pub agreements: IPAgreementsVec<T>,
+    /// Deposit funds
+    pub deposit: BalanceOf<T>,
+    /// IP rating
+    pub rating: Rating,
+}
+
+impl<T: pallet::Config> IPDetails<T> {
+    /// Create a new IP with the status `Pending`.
+    pub fn new(total_storage: StorageSizeMB, deposit: BalanceOf<T>) -> Self {
+        Self {
+            total_storage,
+            status: IPStatus::Pending,
+            agreements: BoundedVec::new(),
+            deposit,
+            rating: Rating {
+                cumulative_score: 0,
+                number_of_ratings: 0,
+            },
+        }
+    }
+}
+
+impl<T: pallet::Config> IPDetails<T> {
+    /// Updates the rating of the IP.
+    pub fn add_score(&mut self, score: Score) {
+        self.rating.cumulative_score += score as u32;
+        self.rating.number_of_ratings += 1;
+    }
+}
+
 /// The statuses an agreement can have. When a consumer requests an agreement the status is
 /// `ConsumerRequest`. The IP can agree to the agreement and the status changes to `Active`, or
 /// the IP can propose a payment plan and the status changes to `IPProposedPaymentPlan`. If the
@@ -62,25 +135,6 @@ pub enum AgreementStatus {
     Active,
     /// Agreement is completed, meaning that the IP has received all the payments
     Completed,
-}
-
-/// The details of an IP. The IP has:
-/// - `total_storage` - the total storage the IP has
-/// - `status` - the current status of the IP
-/// - `agreements` - the vector of all the agreements for this IP
-/// - `deposit` - the deposit the IP has payed during the registration process
-#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
-#[scale_info(skip_type_params(T))]
-#[codec(mel_bound(T: pallet::Config))]
-pub struct IPDetails<T: pallet::Config> {
-    /// Total IP storage
-    pub total_storage: StorageSizeMB,
-    /// IP Status
-    pub status: IPStatus,
-    /// Track of active agreements
-    pub agreements: IPAgreementsVec<T>,
-    /// Deposit funds
-    pub deposit: BalanceOf<T>,
 }
 
 /// An item of the payment history.
@@ -266,13 +320,21 @@ impl<T: pallet::Config> AgreementDetails<T> {
     /// Releases the consumer security and service deposits for the agreement.
     /// The deposit amount currently held is set to zero.
     pub fn release_consumer_deposits(&mut self) -> Result<BalanceOf<T>, DispatchError> {
-        let deposit = self.consumer_security_deposit;
-        T::Currency::release(
-            &HoldReason::ConsumerSecurityDeposit.into(),
-            &self.consumer,
-            deposit,
-            Exact,
-        )?;
+        let deposit = if self.consumer_security_deposit_transferred {
+            BalanceOf::<T>::zero()
+        } else {
+            let deposit = self.consumer_security_deposit;
+
+            T::Currency::release(
+                &HoldReason::ConsumerSecurityDeposit.into(),
+                &self.consumer,
+                deposit,
+                Exact,
+            )?;
+
+            self.consumer_security_deposit = BalanceOf::<T>::zero();
+            deposit
+        };
 
         let service_deposit = self.consumer_service_deposit;
         T::Currency::release(
@@ -282,7 +344,6 @@ impl<T: pallet::Config> AgreementDetails<T> {
             Exact,
         )?;
 
-        self.consumer_security_deposit = BalanceOf::<T>::zero();
         self.consumer_service_deposit = BalanceOf::<T>::zero();
         Ok(deposit.saturating_add(service_deposit))
     }

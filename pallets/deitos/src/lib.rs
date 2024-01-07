@@ -313,6 +313,19 @@ pub mod pallet {
             /// The total amount transferred to the IP
             transferred: BalanceOf<T>,
         },
+        /// A consumer has submitted feedback
+        ConsumerSubmittedFeedback {
+            /// The agreement id
+            agreement_id: T::AgreementId,
+            /// The consumer submitting the feedback
+            consumer: T::AccountId,
+            /// The IP the agreement is with
+            ip: T::AccountId,
+            /// The score of the feedback
+            score: Score,
+            /// The comment of the feedback
+            comment: String,
+        },
     }
 
     /// Errors.
@@ -371,13 +384,7 @@ pub mod pallet {
                 Self::ip_deposit_amount(),
             )?;
 
-            let ip_details = IPDetails::<T> {
-                total_storage,
-                status: IPStatus::Pending,
-                agreements: BoundedVec::new(),
-                deposit: Self::ip_deposit_amount(),
-            };
-
+            let ip_details = IPDetails::new(total_storage, Self::ip_deposit_amount());
             InfrastructureProviders::<T>::insert(&ip, ip_details);
 
             Self::deposit_event(Event::IPRegistered { ip, total_storage });
@@ -847,18 +854,56 @@ pub mod pallet {
             })
         }
 
-        /// UNDER CONSTRUCTION
+        /// Submit feedback for an agreement. The agreement status must be `Completed`. The consumer
+        /// submits a score and a comment. The completed agreement is deleted. The consumer service
+        /// deposit is released.
         #[pallet::call_index(13)]
-        #[pallet::weight(T::WeightInfo::submit_consumer_feedback())]
-        pub fn submit_consumer_feedback(
+        #[pallet::weight(T::WeightInfo::consumer_submit_feedback())]
+        pub fn consumer_submit_feedback(
             origin: OriginFor<T>,
-            _ip: AccountIdLookupOf<T>,
-            _agreement_id: T::AgreementId,
+            agreement_id: T::AgreementId,
+            score: Score,
+            comment: String,
         ) -> DispatchResult {
-            // Check that the extrinsic was signed and get the signer.
-            let _who = ensure_signed(origin)?;
+            let consumer = ensure_signed(origin)?;
 
-            Ok(())
+            let mut agreement =
+                Agreements::<T>::get(agreement_id).ok_or(Error::<T>::AgreementNotFound)?;
+
+            // Check that the transaction was signed by the consumer
+            ensure!(
+                agreement.consumer == consumer,
+                Error::<T>::AgreementNotFound
+            );
+
+            // Check that the agreement is completed
+            ensure!(
+                agreement.status == AgreementStatus::Completed,
+                Error::<T>::AgreementStatusInvalid
+            );
+
+            //Save score
+            InfrastructureProviders::<T>::try_mutate(
+                &agreement.ip,
+                |ip_details| -> Result<_, DispatchError> {
+                    let ip_details = ip_details.as_mut().ok_or(Error::<T>::IPNotFound)?;
+
+                    ip_details.add_score(score);
+                    Ok(())
+                },
+            )?;
+
+            agreement.release_consumer_deposits()?;
+
+            Self::delete_agreement(agreement_id)?;
+
+            Self::success_event(Event::ConsumerSubmittedFeedback {
+                agreement_id,
+                consumer,
+                ip: agreement.ip,
+                score,
+                comment,
+            })
         }
     }
 }
