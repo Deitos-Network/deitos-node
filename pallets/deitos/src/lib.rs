@@ -41,8 +41,8 @@ use frame_support::{
     },
     PalletId,
 };
-pub use log;
-pub use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::prelude::string::String;
 use sp_runtime::{
     traits::{One, Saturating, StaticLookup, Zero},
     BoundedVec, SaturatedConversion,
