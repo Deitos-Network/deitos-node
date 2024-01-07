@@ -34,6 +34,7 @@ use crate::{CurrentAgreementId, IPStatus, PaymentPlan, StorageSizeMB};
 mod agreements;
 mod ip;
 mod payments;
+mod rating;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
