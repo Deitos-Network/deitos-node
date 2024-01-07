@@ -358,7 +358,7 @@ fn test_ip_terminate_nonpay() {
         assert_eq!(Agreements::<Test>::get(agreement_id), None);
 
         // Verify that the IP's balance is properly updated
-        let transferred = 400 * PRICE_STORAGE;
+        let transferred = 400 * PRICE_STORAGE + CONSUMER_SERVICE_DEPOSIT;
         assert_eq!(Balances::free_balance(IP), balance_before + transferred);
 
         // Check for the correct event emission

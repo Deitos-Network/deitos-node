@@ -855,11 +855,14 @@ pub mod pallet {
             let transferred = agreement
                 .has_overdue_installments(current_block_number)
                 .then(|| -> Result<_, DispatchError> {
-                    let total = agreement.transfer_installments(current_block_number)?;
-                    let deposit = agreement.transfer_consumer_security_deposit()?;
+                    let installments = agreement.transfer_installments(current_block_number)?;
+                    let security_deposit = agreement.transfer_consumer_security_deposit()?;
+                    let service_deposit = agreement.transfer_consumer_service_deposit()?;
                     Self::delete_agreement(agreement_id)?;
 
-                    Ok(total.saturating_add(deposit))
+                    Ok(installments
+                        .saturating_add(security_deposit)
+                        .saturating_add(service_deposit))
                 })
                 .ok_or(Error::<T>::NoUnpaidInstallments)??;
 

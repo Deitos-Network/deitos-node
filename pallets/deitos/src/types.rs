@@ -16,7 +16,10 @@
 
 use core::cmp::Ordering;
 
-use frame_support::traits::tokens::{Fortitude::Polite, Restriction::Free};
+use frame_support::traits::tokens::{
+    Fortitude::{Force, Polite},
+    Restriction::Free,
+};
 use frame_system::pallet_prelude::BlockNumberFor;
 use scale_info::TypeInfo;
 
@@ -405,11 +408,28 @@ impl<T: pallet::Config> AgreementDetails<T> {
             self.consumer_security_deposit,
             Exact,
             Free,
-            Polite,
+            Force,
         )?;
 
         self.consumer_security_deposit_transferred = true;
         Ok(self.consumer_security_deposit)
+    }
+
+    /// Transfers the consumer service deposit to the IP.
+    ///
+    /// Returns the amount transferred.
+    pub fn transfer_consumer_service_deposit(&mut self) -> Result<BalanceOf<T>, DispatchError> {
+        T::Currency::transfer_on_hold(
+            &HoldReason::ConsumerServiceDeposit.into(),
+            &self.consumer,
+            &self.ip,
+            self.consumer_service_deposit,
+            Exact,
+            Free,
+            Force,
+        )?;
+
+        Ok(self.consumer_service_deposit)
     }
 
     /// Holds the next installment for the agreement. The installment is calculated based on the
