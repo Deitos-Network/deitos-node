@@ -42,7 +42,7 @@ fn test_consumer_prepay_installment() {
             payment_plan.clone(),
         );
 
-        let installment_cost = 100 * PRICE_STORAGE;
+        let installment_cost = 100 * PRICE_STORAGE * storage;
         let balance_before = Balances::free_balance(CONSUMER);
 
         // Consumer prepays the first installment
@@ -123,11 +123,11 @@ fn test_consumer_prepay_multiple() {
         // Verify that the agreement is correctly updated
         let expected_payment_records = vec![
             PaymentRecord {
-                amount: 100 * PRICE_STORAGE,
+                amount: 100 * PRICE_STORAGE * storage,
                 transferred: false,
             },
             PaymentRecord {
-                amount: 200 * PRICE_STORAGE,
+                amount: 200 * PRICE_STORAGE * storage,
                 transferred: false,
             },
         ];
@@ -138,7 +138,7 @@ fn test_consumer_prepay_multiple() {
         );
 
         // Verify that the consumer's balance is properly updated
-        let total_cost = 300 * PRICE_STORAGE;
+        let total_cost = 300 * PRICE_STORAGE * storage;
         assert_eq!(
             Balances::free_balance(CONSUMER),
             balance_before - total_cost
@@ -206,11 +206,11 @@ fn test_ip_withdraw() {
         // Verify that the agreement is correctly updated
         let expected_payment_records = vec![
             PaymentRecord {
-                amount: 100 * PRICE_STORAGE,
+                amount: 100 * PRICE_STORAGE * storage,
                 transferred: true,
             },
             PaymentRecord {
-                amount: 200 * PRICE_STORAGE,
+                amount: 200 * PRICE_STORAGE * storage,
                 transferred: false,
             },
         ];
@@ -227,7 +227,7 @@ fn test_ip_withdraw() {
         );
 
         // Verify that the IP's balance is properly updated
-        let total_cost = 100 * PRICE_STORAGE;
+        let total_cost = 100 * PRICE_STORAGE * storage;
         assert_eq!(Balances::free_balance(IP), balance_before + total_cost);
 
         //Verify that the consumer's balance is properly updated
@@ -236,7 +236,7 @@ fn test_ip_withdraw() {
                 &HoldReason::ConsumerInstallment.into(),
                 &CONSUMER
             ),
-            200 * PRICE_STORAGE
+            200 * PRICE_STORAGE * storage
         );
 
         // Check for the correct event emission
@@ -297,7 +297,7 @@ fn test_ip_withdraw_completely() {
         assert_eq!(stored_agreement.status, AgreementStatus::Completed);
 
         // Verify that the IP's balance is properly updated
-        let total_cost = 600 * PRICE_STORAGE;
+        let total_cost = 600 * PRICE_STORAGE * storage;
         assert_eq!(Balances::free_balance(IP), balance_before + total_cost);
 
         //Verify that the consumer's balance is properly updated
@@ -358,7 +358,7 @@ fn test_ip_terminate_nonpay() {
         assert_eq!(Agreements::<Test>::get(agreement_id), None);
 
         // Verify that the IP's balance is properly updated
-        let transferred = 400 * PRICE_STORAGE + CONSUMER_SERVICE_DEPOSIT;
+        let transferred = 400 * PRICE_STORAGE * storage + CONSUMER_SERVICE_DEPOSIT;
         assert_eq!(Balances::free_balance(IP), balance_before + transferred);
 
         // Check for the correct event emission
