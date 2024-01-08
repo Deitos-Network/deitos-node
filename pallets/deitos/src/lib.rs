@@ -125,16 +125,12 @@ pub mod pallet {
     #[pallet::composite_enum]
     pub enum HoldReason {
         /// Initial deposit for IP registration
-        #[codec(index = 0)]
         IPInitialDeposit,
         /// Consumer service deposit
-        #[codec(index = 1)]
         ConsumerServiceDeposit,
         /// Consumer deposit for securing an agreement
-        #[codec(index = 2)]
         ConsumerSecurityDeposit,
         /// Consumer installment payment
-        #[codec(index = 3)]
         ConsumerInstallment,
     }
 
