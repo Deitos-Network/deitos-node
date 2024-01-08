@@ -18,7 +18,9 @@ For this test we will use BOB as the corresponding account to register the Infra
 
 In order to commit the registation, the infrastructure provider the following sequence should be executed:
 
-1) Execute the `ipRegister` extrinsic:
+### 1) Register Register
+
+In order to start the registration for the IP the `ipRegister` extrinsic should be executed:
 
 ![userdoc.ip.register](assets/userdoc.ip.register.png)
 
@@ -30,7 +32,7 @@ In order to submit the intent of become an IP in the Deitos Network, the account
 
 ![userdoc.ip.balance](assets/userdoc.ip.balance.png)
 
-2) Manually activate the IP as root.
+### 2) Manually activate the IP as root.
 
 If we inspect the value of the `InfrastructureProviders` storage item for BOB, we can check that the IP status is `Pending`:
 
@@ -46,5 +48,28 @@ This will require using the Sudo tab, that because of the local settings the Roo
 
 Up to this point we should have a fully functional and ready IP to accept agreements!
 
+## Agreement's request (Consumer)
 
+Now we have an infrastructure provider up and running, the next step will be to submit an agreement request taking the consumer role. We will use the CHARLIE test account to play the role of a consumer.
 
+### 1) Execute agreement's request
+
+The first step to start the agreement negotiation process is that a consumer submits an agreement request to the selected IP. 
+
+![userdoc.ip.agreement.request](assets/userdoc.ip.agreement.request.png)
+
+Let's disect each parameterL
+
+Ip: Account for the selected infrastructure Provider.
+Storage: The amount of storage to be used during the agreement. 
+Activation block: As agreements can be negotiated, the activation block has to be set in the future. 
+Payment Plan: This defines the duration of each period during the agreement indicating the beggining and end of each period. 
+
+In the image attached, that would define the following periods for that agreement:
+
+Period 1: 
+
+Start:  50
+End: 75 
+Total blocks: 25
+Cost: 25 * 1,000 (cost per MB ) * 1,000 (amount of MB  requested) = 25,000,000
