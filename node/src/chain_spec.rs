@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
-use sc_service::ChainType;
+use sc_service::{ChainType, Properties};
 use sp_consensus_babe::AuthorityId as BabeId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
@@ -50,6 +50,18 @@ pub fn authority_keys_from_seed(s: &str) -> (BabeId, GrandpaId) {
     (get_from_seed::<BabeId>(s), get_from_seed::<GrandpaId>(s))
 }
 
+/// Properties for Deitos.
+pub fn properties() -> Properties {
+    let mut properties = Properties::new();
+
+    // TODO: get ss58 prefix in registry
+    // properties.insert("ss58Format".into(), 42.into());
+    properties.insert("tokenDecimals".into(), 10.into());
+    properties.insert("tokenSymbol".into(), "DEITO".into());
+
+    properties
+}
+
 pub fn development_config() -> Result<ChainSpec, String> {
     Ok(ChainSpec::builder(
         WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
@@ -73,6 +85,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         ],
         true,
     ))
+    .with_properties(properties())
     .build())
 }
 
@@ -109,6 +122,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         ],
         true,
     ))
+    .with_properties(properties())
     .build())
 }
 
