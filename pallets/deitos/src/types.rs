@@ -67,20 +67,20 @@ pub enum IPStatus {
     Unregistered,
 }
 
-/// The score used to for ranking. The score is a number between 0 and 4.
+/// The score used to for ranking. The score is a number between 1 and 5.
 #[repr(u8)]
 #[derive(Copy, Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
 pub enum Score {
-    /// Zero. Lowest score.
-    Zero = 0,
-    /// One.
+    /// One. Lowest score.
     One = 1,
     /// Two.
     Two = 2,
     /// Three.
     Three = 3,
-    /// Four. Highest score.
+    /// Four.
     Four = 4,
+    /// Five. Highest score.
+    Five = 5,
 }
 
 /// The rating statistics. It has:
