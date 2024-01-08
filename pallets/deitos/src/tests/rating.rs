@@ -52,7 +52,9 @@ fn test_consumer_submit_feedback() {
         assert_ok!(Deitos::consumer_submit_feedback(
             RuntimeOrigin::signed(CONSUMER),
             agreement_id,
+            Score::One,
             Score::Three,
+            Score::Five,
             comment.to_owned(),
         ));
 
@@ -64,8 +66,10 @@ fn test_consumer_submit_feedback() {
         assert_eq!(
             ip_details.rating,
             Rating {
-                cumulative_score: 3,
-                number_of_ratings: 1
+                cumulative_performance: 1,
+                cumulative_stability: 3,
+                cumulative_support: 5,
+                number_of_scores: 1
             }
         );
 
@@ -88,7 +92,9 @@ fn test_consumer_submit_feedback() {
             agreement_id,
             consumer: CONSUMER,
             ip: IP,
-            score: Score::Three,
+            score_performance: Score::One,
+            score_stability: Score::Three,
+            score_support: Score::Five,
             comment: comment.to_owned(),
         }));
     });

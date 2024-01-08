@@ -52,8 +52,10 @@ fn test_correct_ip_registration() {
                 agreements: BoundedVec::new(),
                 deposit: IP_INITIAL_DEPOSIT,
                 rating: Rating {
-                    cumulative_score: 0,
-                    number_of_ratings: 0,
+                    cumulative_performance: 0,
+                    cumulative_stability: 0,
+                    cumulative_support: 0,
+                    number_of_scores: 0,
                 },
             }
         );
