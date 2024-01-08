@@ -333,8 +333,12 @@ pub mod pallet {
             consumer: T::AccountId,
             /// The IP the agreement is with
             ip: T::AccountId,
-            /// The score of the feedback
-            score: Score,
+            /// The performance score
+            score_performance: Score,
+            /// The stability score
+            score_stability: Score,
+            /// The support score
+            score_support: Score,
             /// The comment of the feedback
             comment: String,
         },
@@ -877,7 +881,9 @@ pub mod pallet {
         pub fn consumer_submit_feedback(
             origin: OriginFor<T>,
             agreement_id: T::AgreementId,
-            score: Score,
+            score_performance: Score,
+            score_stability: Score,
+            score_support: Score,
             comment: String,
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
@@ -899,7 +905,9 @@ pub mod pallet {
 
             //Save the score. The IP must exist.
             InfrastructureProviders::<T>::mutate(&agreement.ip, |ip_details| {
-                ip_details.as_mut().map(|x| x.add_score(score))
+                ip_details
+                    .as_mut()
+                    .map(|x| x.add_score(score_performance, score_stability, score_support))
             });
 
             agreement.release_consumer_deposits()?;
@@ -910,7 +918,9 @@ pub mod pallet {
                 agreement_id,
                 consumer,
                 ip: agreement.ip,
-                score,
+                score_performance,
+                score_stability,
+                score_support,
                 comment,
             })
         }

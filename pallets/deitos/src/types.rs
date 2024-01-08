@@ -84,14 +84,20 @@ pub enum Score {
 }
 
 /// The rating statistics. It has:
-/// - `cumulative_score` - the cumulative score is a sum of all the scores given
-/// - `number_of_ratings` - the number of all the scores given
+/// - `cumulative_performance` - is a sum of all the performance scores given
+/// - `cumulative_stability` - is a sum of all the stability scores given
+/// - `cumulative_support` - is a sum of all the support scores given
+/// - `number_of_scores` - the number of all the scores given
 #[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
 pub struct Rating {
-    /// Cumulative score
-    pub cumulative_score: u32,
-    /// Number of ratings
-    pub number_of_ratings: u32,
+    /// Cumulative performance score
+    pub cumulative_performance: u32,
+    /// Cumulative stability score
+    pub cumulative_stability: u32,
+    /// Cumulative support score
+    pub cumulative_support: u32,
+    /// Number of scores
+    pub number_of_scores: u32,
 }
 
 /// The details of an IP. The IP has:
@@ -125,8 +131,10 @@ impl<T: pallet::Config> IPDetails<T> {
             agreements: BoundedVec::new(),
             deposit,
             rating: Rating {
-                cumulative_score: 0,
-                number_of_ratings: 0,
+                cumulative_performance: 0,
+                cumulative_stability: 0,
+                cumulative_support: 0,
+                number_of_scores: 0,
             },
         }
     }
@@ -134,9 +142,11 @@ impl<T: pallet::Config> IPDetails<T> {
 
 impl<T: pallet::Config> IPDetails<T> {
     /// Updates the rating of the IP.
-    pub fn add_score(&mut self, score: Score) {
-        self.rating.cumulative_score += score as u32;
-        self.rating.number_of_ratings += 1;
+    pub fn add_score(&mut self, performance: Score, stability: Score, support: Score) {
+        self.rating.cumulative_performance += performance as u32;
+        self.rating.cumulative_stability += stability as u32;
+        self.rating.cumulative_support += support as u32;
+        self.rating.number_of_scores += 1;
     }
 }
 
