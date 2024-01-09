@@ -274,10 +274,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
         let cost = CurrentPrices::<T>::get()
             .storage_mb_per_block
             .saturating_mul(BalanceOf::<T>::saturated_from(
-                installment_length.saturated_into::<u128>(),
-            ))
-            .saturating_mul(BalanceOf::<T>::saturated_from(
-                self.storage.saturated_into::<u128>(),
+                installment_length.saturated_into::<u128>() * self.storage as u128,
             ));
 
         Some(cost)
