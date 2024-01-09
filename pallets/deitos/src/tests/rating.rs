@@ -76,7 +76,7 @@ fn test_consumer_submit_feedback() {
         // Verify that the consumer is refunded
         assert_eq!(
             Balances::free_balance(CONSUMER),
-            INITIAL_BALANCE - 100 * PRICE_STORAGE
+            INITIAL_BALANCE - 100 * PRICE_STORAGE * storage
         );
 
         assert_eq!(
