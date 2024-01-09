@@ -48,7 +48,7 @@ fn test_consumer_request_agreement() {
         // Assert: Verify that the agreement request is correctly stored
         let expected_agreement_id = 1;
         let stored_agreement = Agreements::<Test>::get(expected_agreement_id).unwrap();
-        let expected_consumer_deposit = 100 * PRICE_STORAGE; // Length of last installment * price per block
+        let expected_consumer_deposit = 100 * storage * PRICE_STORAGE; // Length of last installment * price per block * storage
         assert_eq!(stored_agreement.ip, IP);
         assert_eq!(stored_agreement.consumer, CONSUMER);
         assert_eq!(
@@ -148,7 +148,7 @@ fn test_consumer_accept_agreement() {
         let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
         let payment_plan: PaymentPlan<Test> = vec![activation_block + 300].try_into().unwrap();
-        let initial_consumer_deposit = 300 * PRICE_STORAGE;
+        let initial_consumer_deposit = 300 * PRICE_STORAGE * storage;
 
         // Register and activate the IP
         register_and_activate_ip(IP, storage);
@@ -181,7 +181,7 @@ fn test_consumer_accept_agreement() {
         ));
 
         // Verify that the agreement is correctly updated
-        let expected_consumer_deposit = 200 * PRICE_STORAGE; // Length of last installment * price per block
+        let expected_consumer_deposit = 200 * PRICE_STORAGE * storage; // Length of last installment * price per block
         let stored_agreement = Agreements::<Test>::get(agreement_id).unwrap();
         assert_eq!(
             stored_agreement.consumer_service_deposit,
@@ -225,7 +225,7 @@ fn test_consumer_reject_proposal() {
         let storage: StorageSizeMB = 100;
         let activation_block: BlockNumberFor<Test> = 100;
         let payment_plan: PaymentPlan<Test> = vec![activation_block + 300].try_into().unwrap();
-        let consumer_deposit = 300 * PRICE_STORAGE;
+        let consumer_deposit = 300 * PRICE_STORAGE * storage;
 
         // Register and activate the IP
         register_and_activate_ip(IP, storage);

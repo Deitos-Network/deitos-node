@@ -263,7 +263,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
     }
 
     /// Calculate the cost of an installment. The cost of the installment is the length of the
-    /// installment multiplied by the storage cost per block.
+    /// installment multiplied by the storage cost per block multiplied by the amount of MB requested in the agreement.
     ///
     /// The installment index is the index of the installment in the payment plan. The first
     /// installment has index 0.
@@ -274,7 +274,7 @@ impl<T: pallet::Config> AgreementDetails<T> {
         let cost = CurrentPrices::<T>::get()
             .storage_mb_per_block
             .saturating_mul(BalanceOf::<T>::saturated_from(
-                installment_length.saturated_into::<u128>(),
+                installment_length.saturated_into::<u128>() * self.storage as u128,
             ));
 
         Some(cost)
