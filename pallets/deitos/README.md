@@ -1,7 +1,9 @@
 # `pallet-deitos` 
 
+## 🚧🚧 Under Construction 🚧🚧
+
 ## Overview
-The `pallet-deitos` is a fundamental component of the Deitos Network blockchain node. It's designed to facilitate specific functionalities within the network.
+The `pallet-deitos` is a fundamental component of the Deitos Network blockchain node. It's designed to facilitate the hearth of the Deitos Network.
 
 
 
@@ -18,6 +20,10 @@ The `pallet-deitos` is a fundamental component of the Deitos Network blockchain 
   - `mod.rs`: Module file for tests.
   - `payments.rs`: Tests for payment-related functionalities within the deitos agreeemnts context.
   - `rating.rs`: Tests for rating systems or mechanisms used in On-Chain reputation.
+
+### `pallet-deitos` user guide.
+
+The team behind the Deitos Network development has facilitated a user guide for interactacting from the functional perspective of this pallet. The documentation can be found [HERE](../../docs/pallet-deitos-user-guide.md).
 
 ### Processes Supported from `pallet-deitos`
 

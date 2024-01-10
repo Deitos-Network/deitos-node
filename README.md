@@ -1,3 +1,6 @@
+![deitos.logo](docs/assets/deitos.logo.png)
+## 🚧🚧 Under Construction 🚧🚧
+
 # deitos-node
 
 This repository contains the implementation of the Deitos Network node. 
@@ -32,4 +35,56 @@ After the conclusion of each agreement, participants can review their counterpar
 ## Dispute Resolvers Committee (TBD)
 This group is tasked with resolving any disputes between consumers and infrastructure providers. Membership in this committee isn’t static. Individuals must first nominate themselves, after which all token holders can vote within a specified timeframe to determine the nominee’s inclusion. This election process is cyclical.
 
+## Installatation and Local Development configuration
 
+### Rust installation.
+
+For instructions about how to set the corresponding rust environment, please refeer to this [rust-setup guide](docs/rust-setup.md).
+
+
+### Build
+
+Use the following command to build the node without launching it:
+
+```sh
+cargo build --release
+```
+
+### Embedded Docs
+
+After you build the project, you can use the following command to explore its parameters and subcommands:
+
+```sh
+./target/release/deitos-node -h
+```
+
+You can generate and view the [Rust Docs](https://doc.rust-lang.org/cargo/commands/cargo-doc.html) for this template with this command:
+
+```sh
+cargo +nightly doc --open
+```
+
+### Single-Node Development Chain
+
+The following command starts a single-node development chain that doesn't persist state:
+
+```sh
+./target/release/deitos-node --dev
+```
+
+To purge the development chain's state, run the following command:
+
+```sh
+./target/release/deitos-node purge-chain --dev
+```
+
+To start the development chain with detailed logging, run the following command:
+
+```sh
+RUST_BACKTRACE=1 ./target/release/deitos-node -ldebug --dev
+```
+
+
+## `pallet-deitos`
+
+The Deitos node includes the `pallet-deitos` which contains the core foundational of the Deitos Network. For more information about the pallet functionalities please refeer to the [pallet's README](/pallets/deitos/README.md).
