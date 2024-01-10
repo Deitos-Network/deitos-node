@@ -1,13 +1,13 @@
 [package]
 name = "pallet-deitos"
-version = "4.0.0-dev"
-description = "Pallet for Deitos Network logic"
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io"
-edition.workspace = true
-license = "MIT-0"
+description = "Pallet implementing Deitos Network protocol"
+version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+edition = { workspace = true }
 publish = false
-repository = "https://github.com/substrate-developer-hub/substrate-node-template/"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]

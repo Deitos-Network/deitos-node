@@ -3,8 +3,8 @@ version = "0.0.1"
 authors = ["Deitos"]
 edition = "2021"
 repository = "https://github.com/Deitos-Network/deitos-node.git"
-#homepage = "TODO add homepage"
-#license = "TODO add license"
+homepage = "https://deitos.network/"
+license = "GPL-3.0"
 
 [workspace]
 resolver = "2"
