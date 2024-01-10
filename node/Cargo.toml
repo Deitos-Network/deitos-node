@@ -3,8 +3,8 @@ name = "deitos-node"
 description = "Deitos Node"
 version = { workspace = true }
 authors = { workspace = true }
-#license = { workspace = true }
-#homepage = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
 edition = { workspace = true }
 default-run = "deitos-node"
