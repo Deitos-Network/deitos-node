@@ -1,7 +1,7 @@
 # `pallet-deitos` User Guide
 
 
-This user guide is structured as an interactive tutorial, designed to empower users to seamlessly navigate a range of essential processes within the [`pallet-deitos`](pallets/deitos) which is the core of the functional ecosystem. Each step is elucidated with detailed explanations and visual aids, ensuring a comprehensive and user-friendly experience. The guide covers the following processes:
+This user guide is structured as an interactive tutorial, designed to empower users to seamlessly navigate a range of essential processes within the [`pallet-deitos`](pallets/deitos) (core of Deitos orchestration) . Each step is elucidated with detailed explanations and visual aids, ensuring a comprehensive and user-friendly experience. The guide covers the following processes:
 
 1. **Registering as an Infrastructure Provider:** A step-by-step guide on how to register as an Infrastructure Provider within the system.
 2. **Submitting an Agreement Request as a Consumer:** Instructions on how consumers can initiate an agreement request, detailing the necessary parameters and procedures.
@@ -12,6 +12,10 @@ This user guide is structured as an interactive tutorial, designed to empower us
 7. **Handling Agreement Termination Due to Missed Consumer Payments:** Procedures and implications of terminating agreements due to non-payment by consumers, including the necessary steps and outcomes.
 8. **Enacting Penalties for Missed Payments by Consumers:** Explanation of the protocols and penalties applied to consumers' reserved funds in cases of missed payments, outlining the consequences and enforcement mechanisms.
 
+
+### Deitos Node Start
+
+For detailed instructions on setting up and running the Deitos node, please refer to the [README.md](../README.md) file. 
 
 ## 1 - Infrastructure Provider Registration
 
@@ -46,7 +50,7 @@ This step necessitates the use of the Sudo tab due to local settings where the R
 
 ### 2.1- Execute Agreement Request (Consumer)
 
-Initiating the agreement negotiation process begins with the consumer submitting a request to the selected Infrastructure Provider (IP).
+Initiating the agreement negotiation process begins with the consumer submitting a request to the selected Infrastructure Provider (IP) using the `consumerRequestAgreement` extrinsic:
 
 ![userdoc.consumer.agreement.request](assets/userdoc.consumer.agreement.request.png)
 
@@ -55,7 +59,7 @@ Each parameter of the agreement request is detailed as follows:
 - **IP:** The account of the chosen Infrastructure Provider.
 - **Storage:** The total amount of storage allocated for use during the agreement.
 - **Activation Block:** Given the negotiable nature of agreements, the activation block is set in the future.
-- **Payment Plan:** This outlines the duration of each period within the agreement, specifying the start and end of each period.
+- **Payment Plan:** This outlines the duration of each period within the agreement, specifying the start and end of each period expressed in block numbers.
 
 The accompanying image outlines the agreement's periods as follows:
 
@@ -118,11 +122,11 @@ Upon examining CHARLIE's account post-prepayment, the updated reserved balance i
 
 ### 2.6 - IP Withdrawal and Agreement Completion
 
-Upon the conclusion of the agreement, the Infrastructure Provider (IP) is eligible to withdraw all corresponding installments for the service. The IP can withdraw the entire amount at once by executing the following extrinsic:
+Upon the conclusion of the agreement, the Infrastructure Provider (IP) is eligible to withdraw all corresponding installments for the service. The IP can withdraw the entire amount at once by executing the `IpWithdrawInstallments` extrinsic:
 
 ![userdoc.ip.withdraw](assets/userdoc.ip.withdraw.png)
 
-The subsequent events detail the withdrawal process. With the agreement completed and no further payments due, the system automatically updates the event status to `Completed`:
+The subsequent events detail the withdrawal process. With the agreement completed and no further payments due, the system automatically updates the agremeent's status to `Completed`:
 
 ![userdoc.ip.withdraw.event](assets/userdoc.ip.withdraw.event.png)
 
@@ -136,7 +140,7 @@ The event showcases the submitted feedback:
 
 ![userdoc.consumer.feedback.event](assets/userdoc.consumer.feedback.event.png)
 
-It's important to note that while the consumer can include comments in the feedback, which are displayed in the events, this text is not stored in any storage item.
+It's important to note that while the consumer can include comments in the feedback, which are displayed in the events, this text is not stored in any storage item. This reduce the need for unnecesary storage costs and still, having the text accessible by inspecting the events.
 
 Following the feedback submission, the service deposit is released:
 
@@ -148,7 +152,7 @@ Anticipating a high volume of agreements, storage optimization measures have bee
 
 ## 3 Agreement Renegotiation
 
-The `deitos` pallet is fundamentally designed to offer flexibility, enabling Infrastructure Providers (IPs) and consumers to negotiate mutually beneficial agreements. This flexibility allows for the modification of payment plans if the initial proposal does not meet the needs of both parties.
+The deitos pallet is fundamentally designed to offer flexibility, enabling Infrastructure Providers (IPs) and consumers to negotiate mutually beneficial agreements. This flexibility allows for the modification of payment plans if the initial proposal does not meet the needs of both parties.
 
 ### 3.1 - Execute Agreement Request (Consumer)
 
