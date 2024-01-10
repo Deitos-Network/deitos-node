@@ -1,0 +1,36 @@
+name: Workflow - upload to artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        type: choice
+        description: "The profile to build"
+        default: "production"
+        options:
+          - "production"
+          - "release"
+          - "debug"
+
+jobs:
+  upload:
+    name: Upload to artifacts
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup build dependencies
+        uses: "./.github/templates/setup-build"
+
+      - name: Setup rust toolchain
+        run: rustup show
+
+      - name: Build the project
+        run: |
+          cargo build --profile ${{ github.event.inputs.profile }}
+
+      - name: Upload to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deitos-node
+          path: target/${{ github.event.inputs.profile }}/deitos-node
