@@ -38,7 +38,7 @@ After the conclusion of each agreement, participants can review their counterpar
 
 The Deitos node includes the `pallet-deitos` which contains the core foundational of the Deitos Network. For more information about the pallet functionalities please refeer to the [pallet's README](/pallets/deitos/README.md).
 
-## Installatation and Local Development configuration
+## Installation and Local Development configuration
 
 ### Rust installation.
 
