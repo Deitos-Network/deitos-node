@@ -56,7 +56,7 @@ pub use weights::*;
 
 mod impls;
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
@@ -373,6 +373,10 @@ pub mod pallet {
         /// E.g., the consumer cannot prepay any more installments, or the IP cannot terminate the agreement
         /// due to non-payment, because all installments have been paid.
         NoUnpaidInstallments,
+        /// The agreement does not exist for that consumer.
+        AgreementNotFoundForConsumer,
+        /// Consumer does not have any agreement
+        NoAgreementsForConsumer
     }
 
     #[pallet::call]

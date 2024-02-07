@@ -16,7 +16,6 @@
 
 use core::ops::Add;
 
-use frame_support::transactional;
 use frame_system::pallet_prelude::BlockNumberFor;
 
 use crate::*;
@@ -42,7 +41,6 @@ impl<T: Config> Pallet<T> {
     }
 
     /// Inserts a new agreement into the proper storages and returns the agreement id.
-    #[transactional]
     pub fn insert_agreement(
         agreement: AgreementDetails<T>,
     ) -> Result<T::AgreementId, DispatchError> {
@@ -101,5 +99,16 @@ impl<T: Config> Pallet<T> {
             .map(|end| *end > activation_block)
             .unwrap_or(false)
             && is_strictly_increasing(payment_plan)
+    }
+
+    /// Checks if the account is the consumer for that agreement
+    pub fn consumer_has_agreement(
+        consumer: &AccountIdOf<T>,
+        agreement_id: &T::AgreementId
+    ) -> Result<(), DispatchError> {
+        let agreements = Self::get_consumer_agreement(consumer);
+        agreements.iter().find(|&&id| id == *agreement_id)
+        .ok_or_else(|| Error::<T>::AgreementNotFoundForConsumer.into())
+        .map(|_| ())
     }
 }
