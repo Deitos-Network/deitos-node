@@ -76,6 +76,8 @@ fn file_is_correctly_registered() {
         // Verify that the agreement status is correctly updated
         let file = Files::<Test>::get(agreement_id,file_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Pending);
+        assert_eq!(file.md5, md5);
+
 
         // Check for the correct event emission
         System::assert_has_event(RuntimeEvent::DeitosFs(Event::FileRegistered {
