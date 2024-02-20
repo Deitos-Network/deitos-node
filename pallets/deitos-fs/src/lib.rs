@@ -151,7 +151,7 @@ pub mod pallet {
         IPAgreementsLimit,
     }
 
-/*     /// Hook
+     /// Hook
     #[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn offchain_worker(_block_number: BlockNumberFor<T>) {
@@ -162,7 +162,7 @@ pub mod pallet {
      
 		}
 	}
- */
+
 
 /* 	#[pallet::validate_unsigned]
 	impl<T: Config> ValidateUnsigned for Pallet<T> {
@@ -219,7 +219,7 @@ pub mod pallet {
 fn is_strictly_increasing<T: PartialOrd>(slice: &[T]) -> bool {
     slice.windows(2).all(|window| window[0] < window[1])
 }
-
+/* 
 /// Test
 pub trait ValidateUnsigned {
 	/// The call to validate
@@ -303,4 +303,4 @@ impl<T: Config> Pallet<T> {
 		Ok(body_str.to_string())
 	}
 
-}
+} */

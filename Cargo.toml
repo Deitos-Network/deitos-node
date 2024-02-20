@@ -109,7 +109,7 @@ pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/parityt
 
 # Deitos dependencies
 pallet-deitos = { path = "pallets/deitos", default-features = false }
-
+pallet-deitos-fs = { path = "pallets/deitos-fs", default-features = false }
 
 # Other third party dependencies
 async-trait = "0.1"

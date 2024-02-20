@@ -312,7 +312,7 @@ construct_runtime!(
         TransactionPayment: pallet_transaction_payment,
         Sudo: pallet_sudo,
         Deitos: pallet_deitos,
-        DeitosFs: pallet_deitos_fs
+        FsDeitos: pallet_deitos_fs
     }
 );
 
@@ -369,6 +369,7 @@ mod benches {
         [pallet_timestamp, Timestamp]
         [pallet_sudo, Sudo]
         [pallet_deitos, Deitos]
+        [pallet_deitos_fs, DeitosFs]
     );
 }
 
