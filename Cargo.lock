@@ -1769,6 +1769,7 @@ dependencies = [
  "pallet-babe",
  "pallet-balances",
  "pallet-deitos",
+ "pallet-deitos-fs",
  "pallet-grandpa",
  "pallet-sudo",
  "pallet-timestamp",

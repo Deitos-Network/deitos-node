@@ -18,6 +18,8 @@ use super::*;
 use frame_support::PalletId;
 /// Import the deitos pallet.
 pub use pallet_deitos;
+pub use pallet_deitos_fs;
+pub type FileId = u64;
 pub type AgreementId = u32;
 
 parameter_types! {
@@ -34,4 +36,17 @@ impl pallet_deitos::Config for Runtime {
     type IPAgreementsLimit = ConstU32<500>;
     type ConsumerAgreementsLimit = ConstU32<500>;
     type PalletId = DeitosPalletId;
+}
+
+
+parameter_types! {
+    pub const DeitosPalletFsId: PalletId = PalletId(*b"DeitosFS");
+}
+
+impl pallet_deitos_fs::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_deitos_fs::weights::SubstrateWeight<Runtime>;
+    type Currency = Balances;
+    type FileId = FileId;
+    type PalletId = DeitosPalletFsId;
 }
