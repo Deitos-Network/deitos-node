@@ -1,4 +1,4 @@
-name: Workflow - upload to artifacts
+name: Workflow - Upload to artifacts
 
 on:
   workflow_dispatch:
