@@ -51,7 +51,8 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-system-benchmarking = { workspace = true, optional = true }
 
 # Local Dependencies
-pallet-deitos = { path = "../pallets/deitos", default-features = false }
+pallet-deitos = {  workspace = true }
+pallet-deitos-fs = {  workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -70,6 +71,7 @@ std = [
     "pallet-babe/std",
     "pallet-balances/std",
     "pallet-deitos/std",
+    "pallet-deitos-fs/std",
     "pallet-grandpa/std",
     "pallet-sudo/std",
     "pallet-timestamp/std",
