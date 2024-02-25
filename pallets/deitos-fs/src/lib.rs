@@ -91,7 +91,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-        CreateSignedTransaction<Call<Self>> + frame_system::Config + pallet_deitos::Config
+	CreateSignedTransaction<Call<Self>> + frame_system::Config + pallet_deitos::Config
     {
         /// The overarching runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
