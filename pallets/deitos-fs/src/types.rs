@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
-
 use scale_info::TypeInfo;
 
 use crate::*;
@@ -29,11 +28,11 @@ pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 /// Type alias for `AccountId` lookup from the runtime.
 pub type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
-pub type FileName = BoundedVec<u8,ConstU32<64>>;
+pub type FileName = BoundedVec<u8, ConstU32<64>>;
 
-
-/// Lifecycle of a file 
+/// Lifecycle of a file
 #[derive(Copy, Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
+#[scale_info(skip_type_params(T))]
 pub enum FileValidationStatus {
     /// FileStatus is being checked
     Pending,
@@ -42,9 +41,8 @@ pub enum FileValidationStatus {
     /// It was a conflict during the initial check
     Conflict,
     /// To be removed,
-    ToBeRemoved
+    ToBeRemoved,
 }
-
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
 #[scale_info(skip_type_params(T))]
@@ -58,6 +56,8 @@ pub struct FileDetails<T: pallet::Config> {
     pub file_name: FileName,
     /// File validation status
     pub status: FileValidationStatus,
+    /// Check error count
+    pub error_count: u32,
 }
 
 impl<T: pallet::Config> FileDetails<T> {
@@ -67,13 +67,13 @@ impl<T: pallet::Config> FileDetails<T> {
             file_name,
             agreement_id,
             md5,
-            status: FileValidationStatus::Pending
+            status: FileValidationStatus::Pending,
+            error_count: 0,
         }
     }
 
-        /// Updates the rating of the IP.
-        pub fn update_status(&mut self, status: FileValidationStatus ) {
-            self.status = status;
-        }
+    /// Updates the rating of the IP.
+    pub fn update_status(&mut self, status: FileValidationStatus) {
+        self.status = status;
+    }
 }
-

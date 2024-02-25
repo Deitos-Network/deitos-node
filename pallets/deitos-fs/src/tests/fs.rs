@@ -20,10 +20,9 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_deitos::StorageSizeMB;
 
 use crate::{
-    pallet::{CurrentFileId, Files, Event},
+    pallet::{CurrentFileId, Event, Files},
     types::*,
 };
-
 
 fn to_md5(input: &str) -> [u8; 32] {
     let mut array = [0; 32]; // Initialize with zeros
@@ -32,8 +31,7 @@ fn to_md5(input: &str) -> [u8; 32] {
     array
 }
 
-
-pub fn create_agreement(){
+pub fn create_agreement() {
     let storage: StorageSizeMB = 100;
     let activation_block: BlockNumberFor<Test> = 100;
     let payment_plan: PaymentPlan<Test> = vec![activation_block + 100].try_into().unwrap();
@@ -65,7 +63,7 @@ fn file_is_correctly_registered() {
         let file_id = 1;
         create_agreement();
 
-        let md5  = to_md5("73f23a2793ce94355d83c1da8555c3de");
+        let md5 = to_md5("73f23a2793ce94355d83c1da8555c3de");
 
         assert_ok!(DeitosFs::register_file(
             RuntimeOrigin::signed(CONSUMER),
@@ -74,16 +72,15 @@ fn file_is_correctly_registered() {
         ));
 
         // Verify that the agreement status is correctly updated
-        let file = Files::<Test>::get(agreement_id,file_id).unwrap();
+        let file = Files::<Test>::get(agreement_id, file_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Pending);
         assert_eq!(file.md5, md5);
-
 
         // Check for the correct event emission
         System::assert_has_event(RuntimeEvent::DeitosFs(Event::FileRegistered {
             agreement_id,
             file_id,
-            md5
+            md5,
         }));
     });
 }

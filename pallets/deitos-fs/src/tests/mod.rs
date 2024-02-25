@@ -21,13 +21,13 @@ use frame_support::{
     traits::{ConstU32, ConstU64},
     PalletId,
 };
+use pallet_deitos::{CurrentAgreementId, IPStatus, PaymentPlan, StorageSizeMB};
 use sp_core::H256;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
-use pallet_deitos::{CurrentAgreementId, IPStatus, PaymentPlan, StorageSizeMB};
 
 use crate as pallet_deitos_fs;
 

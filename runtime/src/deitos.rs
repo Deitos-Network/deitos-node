@@ -23,7 +23,6 @@ pub use pallet_deitos_fs;
 pub type AgreementId = u32;
 pub type FileId = u32;
 
-
 parameter_types! {
     pub const DeitosPalletId: PalletId = PalletId(*b"DeitosId");
 }
@@ -50,5 +49,5 @@ impl pallet_deitos_fs::Config for Runtime {
     type Currency = Balances;
     type FileId = FileId;
     type PalletId = DeitosFsPalletId;
-	type Randomness = pallet_babe::RandomnessFromOneEpochAgo<Runtime>;
+    type Randomness = pallet_babe::RandomnessFromOneEpochAgo<Runtime>;
 }
