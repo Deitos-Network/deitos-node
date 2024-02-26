@@ -55,7 +55,7 @@ pub use sp_runtime::{
 use frame_support::traits::Randomness;
 use frame_system::offchain::{
     AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
-    SignedPayload, Signer, SigningTypes, SubmitTransaction,
+    SignedPayload, Signer, SigningTypes, SubmitTransaction, SendTransactionTypes
 };
 use rand_chacha::{
     rand_core::{RngCore, SeedableRng},
@@ -91,7 +91,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-	CreateSignedTransaction<Call<Self>> + frame_system::Config + pallet_deitos::Config
+		SendTransactionTypes<Call<Self>> + frame_system::Config + pallet_deitos::Config
     {
         /// The overarching runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
