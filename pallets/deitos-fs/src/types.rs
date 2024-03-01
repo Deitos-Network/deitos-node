@@ -44,7 +44,7 @@ pub enum FileValidationStatus {
     ToBeRemoved,
 }
 
-#[derive(Clone, Encode, Decode, Eq, PartialEq, Debug, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 #[codec(mel_bound(T: pallet::Config))]
 pub struct FileDetails<T: pallet::Config> {
@@ -77,3 +77,17 @@ impl<T: pallet::Config> FileDetails<T> {
         self.status = status;
     }
 }
+
+impl<T: pallet::Config> core::fmt::Debug for FileDetails<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "FileDetails {{ agreement_id: {:?}, md5: {:?}, file_name: {:?}, status: {:?}, error_count: {:?} }}", self.agreement_id, self.md5, self.file_name, self.status, self.error_count)
+    }
+}
+
+pub enum OffChainType {
+    /// File upload validation
+    FileUpload,
+    /// Data integrity check
+    DataIntegrityCheck
+}
+
