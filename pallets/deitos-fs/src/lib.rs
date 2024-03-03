@@ -41,11 +41,12 @@ use frame_support::{
     PalletId,
 };
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+
 pub use sp_runtime::{
     offchain::{
         http,
         storage::{MutateStorageError, StorageRetrievalError, StorageValueRef},
-        Duration,
+        Duration, Timestamp
     },
     traits::{One, Saturating, StaticLookup, TrailingZeroInput, Zero},
     transaction_validity::{InvalidTransaction, TransactionValidity, ValidTransaction},
@@ -83,6 +84,8 @@ pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
+    use core::result;
+
     use frame_system::pallet_prelude::*;
 
     use super::*;
@@ -100,7 +103,7 @@ pub mod pallet {
         /// A type representing the weights required by the dispatchables of this pallet.
         type WeightInfo: WeightInfo;
 
-        type Randomness: Randomness<Self::Hash, BlockNumberFor<Self>>;
+        type Randomness: Randomness<Option<Self::Hash>, BlockNumberFor<Self>>;
 
         /// The fungible used for deposits.
         type Currency: FunInspect<Self::AccountId>
@@ -187,20 +190,26 @@ pub mod pallet {
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
+           
             for (file_id, file) in FilesToBeChecked::<T>::iter() {
-            
+                log::info!("Veryfing file ID: {:?}", file_id);
                 let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
                 let hadoop_file_hash = Self::fetch_file_hash(&name).unwrap();
 
                 Self::unsigned_file_upload(file_id, file, hadoop_file_hash);
             }
 
-			if Self::is_current_block_eligible(block_number.saturated_into(), 12345) {
-				Self::unsigned_check_integrity(block_number);
+ 			if Self::is_current_block_eligible(block_number.saturated_into(), 12345) {
+                let current_file_id = CurrentFileId::<T>::get();
+                if current_file_id.is_zero() {
+                    return;
+                }
+                let (file_id,file, result) = Self::check_data_integrity_protocol().unwrap();
+                Self::unsigned_check_integrity(file_id,file,result);
 			} else {
 				log::info!("Current block is not eligible {:?}", block_number);
-			}
-
+			} 
+ 
 
 
         }
@@ -223,12 +232,10 @@ pub mod pallet {
             match call {
                 Call::submit_file_validation {
                     file_id: _file_id,
-                    file: file_id,
+                    file: _file,
                     returned_hash: _returned_hash,
                 } => valid_tx(b"submit_file_validation".to_vec()),
-				Call::data_integrity_protocol {
-					block_number: _block_number,
-                } => valid_tx(b"data_integrity_protocol".to_vec()),
+				Call::data_integrity_protocol {file_id, file, result} => valid_tx(b"data_integrity_protocol".to_vec()),
                 _ => InvalidTransaction::Call.into(),
             }
         }
@@ -254,6 +261,7 @@ pub mod pallet {
             let file = FileDetails::<T>::new(agreement_id, md5, file_name);
 
             FilesToBeChecked::<T>::insert(file_id, file);
+            CurrentFileId::<T>::put(file_id);
 
             Self::deposit_event(Event::FileRegistered {
                 agreement_id,
@@ -275,9 +283,11 @@ pub mod pallet {
             let mut new_file = file.clone();
             if file.md5 == returned_hash && file.status == FileValidationStatus::Pending {
                 new_file.status = FileValidationStatus::Verified;
+
                 Files::<T>::insert(file_id, new_file);
                 FilesToBeChecked::<T>::remove(file_id);
                 Self::deposit_event(Event::FileVerified { file_id });
+
                 log::info!("ALL GOOD");
             } else {
                 FilesToBeChecked::<T>::mutate(file_id, |file_option| {
@@ -305,39 +315,18 @@ pub mod pallet {
         #[pallet::weight(<T as Config>::WeightInfo::register_file())]
         pub fn data_integrity_protocol(
             origin: OriginFor<T>,
-			block_number: BlockNumberFor<T>,
+            file_id: T::FileId, file: FileDetails<T>, result: CheckResult
         ) -> DispatchResult {
             ensure_none(origin)?;
-			let last_file_id = CurrentFileId::<T>::get();
-			if last_file_id.is_zero() {
-				return Ok(());
-			}
-			let last_file_id: u32 = last_file_id.saturated_into();
+            match result {
+                CheckResult::CheckPassed => {
+                    Self::deposit_event(Event::DataIntegrityCheckSuccessful { file_id });
+                },
+                CheckResult::DataIntegrityCheckFailed => {
+                    Self::deposit_event(Event::DataIntegrityCheckFailed { file_id });
+                }
+            }
 
-            let phrase = b"deitos-fs-offchain-worker";
-            let (seed, block) = T::Randomness::random(phrase);
-
-            let seed_as_bytes = seed.encode();
-            let encoded_block_number = block_number.encode();
-            let combined_seed =
-                [seed_as_bytes.as_slice(), encoded_block_number.as_slice()].concat();
-            let hash_of_combined_seed = sp_io::hashing::blake2_256(&combined_seed);
-            let seed_array: [u8; 32] = {
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&hash_of_combined_seed);
-                arr
-            };
-            let mut rng = ChaChaRng::from_seed(seed_array);
-            let random_value = rng.next_u32();
-            let file_id: T::FileId = (1 + (random_value % last_file_id)).into();
-            let file: FileDetails<T> = Files::<T>::get(file_id).unwrap();
-            let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
-            let hadoop_file_hash = Self::fetch_file_hash(name).unwrap();
-            if file.md5 == hadoop_file_hash {
-                Self::deposit_event(Event::DataIntegrityCheckSuccessful { file_id });
-            } else {
-                Self::deposit_event(Event::DataIntegrityCheckFailed { file_id });
-            } 
             Ok(())
         }
     }
@@ -347,6 +336,7 @@ impl<T: Config> Pallet<T> {
     fn fetch_file_hash(file_id: &str) -> Result<[u8; 64], http::Error> {
         let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
         let url = format!("http://localhost:3030/calculate/{}", file_id);
+        log::info!("DI fetch_file_hash url {:?}", url);
         let request = http::Request::get(&url);
         let pending = request
             .deadline(deadline)
@@ -363,7 +353,9 @@ impl<T: Config> Pallet<T> {
 
         let body = response.body().collect::<Vec<u8>>();
         let mut array = [0u8; 64];
+        log::info!("DI fetch_file_hash array  {:?}", array);
         let bytes_to_copy = body.len().min(64);
+
         array[..bytes_to_copy].copy_from_slice(&body[..bytes_to_copy]);
 
         Ok(array)
@@ -387,18 +379,45 @@ impl<T: Config> Pallet<T> {
 		})
 	}
 
-	fn unsigned_check_integrity(
-  		block_number: BlockNumberFor<T>,
-    ) -> Result<(), Error<T>> {
-		let call = Call::data_integrity_protocol {
-			block_number
-		};
+	fn unsigned_check_integrity(file_id: T::FileId, file: FileDetails<T>,result: CheckResult) -> Result<(), Error<T>> {
+		let call = Call::data_integrity_protocol {file_id, file,result};
 
 		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
 			log::error!("Failed in offchain_unsigned_tx");
 			<Error<T>>::OffchainUnsignedTxError
 		})
 	}
+
+    fn check_data_integrity_protocol() -> Result<(T::FileId,  FileDetails<T>,  CheckResult), Error<T>> { 
+        let last_file_id = CurrentFileId::<T>::get();
+        log::info!("DI last_file_id {:?}", last_file_id);
+        let last_file_id: u32 = last_file_id.saturated_into();
+
+        let phrase = b"deitos-fs-offchain-worker";
+        let (seed, _block) = T::Randomness::random(phrase);
+        let seed_as_bytes = seed.encode(); // This gives you a Vec<u8>
+        let seed_slice = seed_as_bytes.as_slice(); // Convert Vec<u8> to &[u8]
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed_slice))
+        .expect("input is padded with zeroes; qed");
+        log::info!("DI seed {:?}", seed);
+
+        let mut rng = ChaChaRng::from_seed(seed);
+        let random_value = rng.next_u32();
+        let file_id: T::FileId = (1 + (random_value % last_file_id)).into();
+        let file: FileDetails<T> = Files::<T>::get(file_id).unwrap();
+        let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
+        log::info!("DI name {:?}", name);
+
+        let hadoop_file_hash = Self::fetch_file_hash(name).unwrap();
+
+        log::info!("DI hadoop_file_hash {:?}", hadoop_file_hash);
+ 
+        if file.md5 == hadoop_file_hash {
+            Ok((file_id, file, CheckResult::CheckPassed))
+        } else {
+            Ok((file_id, file, CheckResult::DataIntegrityCheckFailed))
+        } 
+    }
 
 	fn is_current_block_eligible(current_block_number: u32, seed: u32) -> bool {
 		let range_size = 10;

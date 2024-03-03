@@ -49,5 +49,5 @@ impl pallet_deitos_fs::Config for Runtime {
     type Currency = Balances;
     type FileId = FileId;
     type PalletId = DeitosFsPalletId;
-    type Randomness = pallet_babe::RandomnessFromOneEpochAgo<Runtime>;
+    type Randomness = pallet_babe::ParentBlockRandomness<Runtime>;
 }

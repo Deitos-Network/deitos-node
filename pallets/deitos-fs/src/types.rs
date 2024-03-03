@@ -84,10 +84,13 @@ impl<T: pallet::Config> core::fmt::Debug for FileDetails<T> {
     }
 }
 
-pub enum OffChainType {
+#[derive(Copy, Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
+#[scale_info(skip_type_params(T))]
+pub enum CheckResult {
     /// File upload validation
-    FileUpload,
+    CheckPassed,
     /// Data integrity check
-    DataIntegrityCheck
+    DataIntegrityCheckFailed
 }
+
 
