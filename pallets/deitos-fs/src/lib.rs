@@ -16,9 +16,7 @@
 
 //! # Deitos Pallet
 //!
-//! The Deitos pallet implements the Deitos protocol. It allows Infrastructure Providers (IPs) to
-//! register and manage their storage capacity and consumers to request storage capacity from IPs.
-//! The protocol is designed to be flexible and allow for different payment plans.
+//! The File System Deitos pallet provides functionality for related to file management and integrity checks.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

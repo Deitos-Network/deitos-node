@@ -16,10 +16,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
-// TODO: Implement benchmarks for the pallet.
 
 #![cfg(feature = "runtime-benchmarks")]
-// TODO: Remove this
 #![allow(warnings)]
 
 use frame_benchmarking::v2::*;
