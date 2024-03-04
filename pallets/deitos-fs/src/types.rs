@@ -30,6 +30,8 @@ pub type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLo
 
 pub type FileName = BoundedVec<u8, ConstU32<64>>;
 
+pub type FileHash = [u8; 64];
+
 /// Lifecycle of a file
 #[derive(Copy, Clone, Encode, Decode, Eq, PartialEq, MaxEncodedLen, TypeInfo, Debug)]
 #[scale_info(skip_type_params(T))]
@@ -50,8 +52,8 @@ pub enum FileValidationStatus {
 pub struct FileDetails<T: pallet::Config> {
     /// Agreement ID
     pub agreement_id: T::AgreementId,
-    /// MD5 of the file
-    pub md5: [u8; 64],
+    /// hash of the file
+    pub hash: FileHash,
     /// file name
     pub file_name: FileName,
     /// File validation status
@@ -62,11 +64,11 @@ pub struct FileDetails<T: pallet::Config> {
 
 impl<T: pallet::Config> FileDetails<T> {
     /// Create a new IP with the status `Pending`.
-    pub fn new(agreement_id: T::AgreementId, md5: [u8; 64], file_name: FileName) -> Self {
+    pub fn new(agreement_id: T::AgreementId, hash: FileHash, file_name: FileName) -> Self {
         Self {
             file_name,
             agreement_id,
-            md5,
+            hash,
             status: FileValidationStatus::Pending,
             error_count: 0,
         }
@@ -80,7 +82,7 @@ impl<T: pallet::Config> FileDetails<T> {
 
 impl<T: pallet::Config> core::fmt::Debug for FileDetails<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "FileDetails {{ agreement_id: {:?}, md5: {:?}, file_name: {:?}, status: {:?}, error_count: {:?} }}", self.agreement_id, self.md5, self.file_name, self.status, self.error_count)
+        write!(f, "FileDetails {{ agreement_id: {:?}, hash: {:?}, file_name: {:?}, status: {:?}, error_count: {:?} }}", self.agreement_id, self.hash, self.file_name, self.status, self.error_count)
     }
 }
 

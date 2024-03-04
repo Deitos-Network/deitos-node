@@ -29,12 +29,11 @@ use frame_support::{
         tokens::{
             fungible::{
                 hold::{
-                    Balanced as BalancedHold, Mutate as FunHoldMutate,
+                    Balanced as BalancedHold,
                     Unbalanced as FunHoldUnbalanced,
                 },
                 Inspect as FunInspect, Mutate as FunMutate,
-            },
-            Precision::Exact,
+            }
         },
         ConstU32, Get,
     },
@@ -54,17 +53,14 @@ pub use sp_runtime::{
 };
 
 use frame_support::traits::Randomness;
-use frame_system::offchain::{
-    AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
-    SignedPayload, Signer, SigningTypes, SubmitTransaction, SendTransactionTypes
-};
+use frame_system::offchain::{SubmitTransaction, SendTransactionTypes};
 use rand_chacha::{
     rand_core::{RngCore, SeedableRng},
     ChaChaRng,
 };
 use scale_info::prelude::format;
 use sp_std::{convert::TryInto, prelude::*};
-use frame_system::pallet_prelude::BlockNumberFor;
+
 
 #[warn(unused_imports)]
 pub use pallet::*;
@@ -84,8 +80,6 @@ pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use core::result;
-
     use frame_system::pallet_prelude::*;
 
     use super::*;
@@ -151,8 +145,8 @@ pub mod pallet {
             agreement_id: T::AgreementId,
             /// The file id
             file_id: T::FileId,
-            /// File MD5
-            md5: [u8; 64],
+            /// File hash
+            hash: FileHash,
         },
         FileVerified {
             /// The file id
@@ -183,7 +177,13 @@ pub mod pallet {
     pub enum Error<T> {
         /// IP agreements limit reached
         IPAgreementsLimit,
+        /// Off chain unsigned Tx Error.
         OffchainUnsignedTxError,
+        /// Some internal error during the check
+        CheckDataInternalFailure,
+        /// File fetched Failed
+        FileFetchFailed,
+
     }
 
     /// Hook
@@ -192,11 +192,10 @@ pub mod pallet {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
            
             for (file_id, file) in FilesToBeChecked::<T>::iter() {
-                log::info!("Veryfing file ID: {:?}", file_id);
                 let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
                 let hadoop_file_hash = Self::fetch_file_hash(&name).unwrap();
 
-                Self::unsigned_file_upload(file_id, file, hadoop_file_hash);
+                let _ = Self::unsigned_file_upload(file_id, file, hadoop_file_hash).map_err(|_| <Error<T>>::FileFetchFailed);
             }
 
  			if Self::is_current_block_eligible(block_number.saturated_into(), 12345) {
@@ -204,24 +203,18 @@ pub mod pallet {
                 if current_file_id.is_zero() {
                     return;
                 }
-                let (file_id,file, result) = Self::check_data_integrity_protocol().unwrap();
-                Self::unsigned_check_integrity(file_id,file,result);
-			} else {
-				log::info!("Current block is not eligible {:?}", block_number);
-			} 
- 
-
-
+                let (file_id, result) = Self::check_data_integrity_protocol().unwrap();
+                let _ = Self::unsigned_check_integrity(file_id,result).map_err(|_| <Error<T>>::FileFetchFailed);
+			}
         }
     }
 
     #[pallet::validate_unsigned]
     impl<T: Config> ValidateUnsigned for Pallet<T> {
         type Call = Call<T>;
-
         fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
             let valid_tx = |provide| {
-                ValidTransaction::with_tag_prefix("ocw-demo")
+                ValidTransaction::with_tag_prefix("ocw-deitos")
                     .priority(100_u64)
                     .and_provides([&provide])
                     .longevity(3)
@@ -235,7 +228,7 @@ pub mod pallet {
                     file: _file,
                     returned_hash: _returned_hash,
                 } => valid_tx(b"submit_file_validation".to_vec()),
-				Call::data_integrity_protocol {file_id, file, result} => valid_tx(b"data_integrity_protocol".to_vec()),
+				Call::data_integrity_protocol {file_id: _file_id, result: _result} => valid_tx(b"data_integrity_protocol".to_vec()),
                 _ => InvalidTransaction::Call.into(),
             }
         }
@@ -243,22 +236,23 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
+        /// This call register a file for a certain agreement. It checks the consumer has an active agreement that allows the upload.
         #[pallet::call_index(0)]
         #[pallet::weight(<T as Config>::WeightInfo::register_file())]
         pub fn register_file(
             origin: OriginFor<T>,
             agreement_id: T::AgreementId,
-            md5: [u8; 64],
+            hash: FileHash,
             file_name: FileName,
         ) -> DispatchResult {
             let _consumer = ensure_signed(origin)?;
 
-            // TODO commented for quick testing
-            //  pallet_deitos::Pallet::<T>::consumer_has_agreement(&consumer,&agreement_id)?;
+
+            pallet_deitos::Pallet::<T>::consumer_has_agreement(&consumer,&agreement_id)?;
 
             let file_id: T::FileId = Self::next_file_id();
 
-            let file = FileDetails::<T>::new(agreement_id, md5, file_name);
+            let file = FileDetails::<T>::new(agreement_id, hash, file_name);
 
             FilesToBeChecked::<T>::insert(file_id, file);
             CurrentFileId::<T>::put(file_id);
@@ -266,29 +260,30 @@ pub mod pallet {
             Self::deposit_event(Event::FileRegistered {
                 agreement_id,
                 file_id,
-                md5,
+                hash,
             });
             Ok(())
         }
 
+        /// Unsigned call to submit the file validation from the offchain worker.
+        /// It checks the hash returned from the offchain worker and updates the file status if it matches.
+        /// In case not, it increases the error count.
         #[pallet::call_index(1)]
         #[pallet::weight(<T as Config>::WeightInfo::register_file())]
         pub fn submit_file_validation(
             origin: OriginFor<T>,
             file_id: T::FileId,
             file: FileDetails<T>,
-            returned_hash: [u8; 64],
+            returned_hash: FileHash,
         ) -> DispatchResult {
             ensure_none(origin)?;
             let mut new_file = file.clone();
-            if file.md5 == returned_hash && file.status == FileValidationStatus::Pending {
+            if file.hash == returned_hash && file.status == FileValidationStatus::Pending {
                 new_file.status = FileValidationStatus::Verified;
 
                 Files::<T>::insert(file_id, new_file);
                 FilesToBeChecked::<T>::remove(file_id);
                 Self::deposit_event(Event::FileVerified { file_id });
-
-                log::info!("ALL GOOD");
             } else {
                 FilesToBeChecked::<T>::mutate(file_id, |file_option| {
                     if let Some(file_check) = file_option {
@@ -296,10 +291,8 @@ pub mod pallet {
 
                         if file_check.error_count > 3 {
                             file_check.status = FileValidationStatus::Conflict;
-                            log::info!("INCREASE COUNT");
                             Self::deposit_event(Event::FileConflict { file_id });
                         } else {
-                            log::info!("FILE NOT VERIFIED");
                             Self::deposit_event(Event::FileNotVerified {
                                 file_id,
                                 error_count: file_check.error_count,
@@ -315,7 +308,8 @@ pub mod pallet {
         #[pallet::weight(<T as Config>::WeightInfo::register_file())]
         pub fn data_integrity_protocol(
             origin: OriginFor<T>,
-            file_id: T::FileId, file: FileDetails<T>, result: CheckResult
+            file_id: T::FileId, 
+            result: CheckResult
         ) -> DispatchResult {
             ensure_none(origin)?;
             match result {
@@ -333,10 +327,10 @@ pub mod pallet {
 }
 
 impl<T: Config> Pallet<T> {
-    fn fetch_file_hash(file_id: &str) -> Result<[u8; 64], http::Error> {
+    fn fetch_file_hash(file_id: &str) -> Result<FileHash, http::Error> {
         let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
+        // TODO: Replace this with the actual URL
         let url = format!("http://localhost:3030/calculate/{}", file_id);
-        log::info!("DI fetch_file_hash url {:?}", url);
         let request = http::Request::get(&url);
         let pending = request
             .deadline(deadline)
@@ -345,7 +339,6 @@ impl<T: Config> Pallet<T> {
         let response = pending
             .try_wait(deadline)
             .map_err(|_| http::Error::DeadlineReached)??;
-        // Let's check the status code before we proceed to reading the response.
         if response.code != 200 {
             log::warn!("Unexpected status code: {}", response.code);
             return Err(http::Error::Unknown);
@@ -353,7 +346,6 @@ impl<T: Config> Pallet<T> {
 
         let body = response.body().collect::<Vec<u8>>();
         let mut array = [0u8; 64];
-        log::info!("DI fetch_file_hash array  {:?}", array);
         let bytes_to_copy = body.len().min(64);
 
         array[..bytes_to_copy].copy_from_slice(&body[..bytes_to_copy]);
@@ -364,7 +356,7 @@ impl<T: Config> Pallet<T> {
     fn unsigned_file_upload(
         file_id: T::FileId,
         file: FileDetails<T>,
-        returned_hash: [u8; 64],
+        returned_hash: FileHash,
     ) -> Result<(), Error<T>> {
 
 		let call = Call::submit_file_validation {
@@ -379,8 +371,8 @@ impl<T: Config> Pallet<T> {
 		})
 	}
 
-	fn unsigned_check_integrity(file_id: T::FileId, file: FileDetails<T>,result: CheckResult) -> Result<(), Error<T>> {
-		let call = Call::data_integrity_protocol {file_id, file,result};
+	fn unsigned_check_integrity(file_id: T::FileId,result: CheckResult) -> Result<(), Error<T>> {
+		let call = Call::data_integrity_protocol {file_id,result};
 
 		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
 			log::error!("Failed in offchain_unsigned_tx");
@@ -388,7 +380,7 @@ impl<T: Config> Pallet<T> {
 		})
 	}
 
-    fn check_data_integrity_protocol() -> Result<(T::FileId,  FileDetails<T>,  CheckResult), Error<T>> { 
+    fn check_data_integrity_protocol() -> Result<(T::FileId,  CheckResult), Error<T>> { 
         let last_file_id = CurrentFileId::<T>::get();
         log::info!("DI last_file_id {:?}", last_file_id);
         let last_file_id: u32 = last_file_id.saturated_into();
@@ -397,25 +389,18 @@ impl<T: Config> Pallet<T> {
         let (seed, _block) = T::Randomness::random(phrase);
         let seed_as_bytes = seed.encode(); // This gives you a Vec<u8>
         let seed_slice = seed_as_bytes.as_slice(); // Convert Vec<u8> to &[u8]
-        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed_slice))
-        .expect("input is padded with zeroes; qed");
-        log::info!("DI seed {:?}", seed);
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed_slice)).map_err(|_| <Error<T>>::CheckDataInternalFailure)?;
 
         let mut rng = ChaChaRng::from_seed(seed);
         let random_value = rng.next_u32();
         let file_id: T::FileId = (1 + (random_value % last_file_id)).into();
-        let file: FileDetails<T> = Files::<T>::get(file_id).unwrap();
-        let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
-        log::info!("DI name {:?}", name);
-
-        let hadoop_file_hash = Self::fetch_file_hash(name).unwrap();
-
-        log::info!("DI hadoop_file_hash {:?}", hadoop_file_hash);
- 
-        if file.md5 == hadoop_file_hash {
-            Ok((file_id, file, CheckResult::CheckPassed))
+        let file: FileDetails<T> = Files::<T>::get(file_id).ok_or(Error::<T>::CheckDataInternalFailure)?;
+        let name = sp_std::str::from_utf8(file.file_name.as_slice()).map_err(|_| <Error<T>>::CheckDataInternalFailure)?;
+        let hadoop_file_hash = Self::fetch_file_hash(name).map_err(|_| <Error<T>>::FileFetchFailed)?;
+        if file.hash == hadoop_file_hash {
+            Ok((file_id, CheckResult::CheckPassed))
         } else {
-            Ok((file_id, file, CheckResult::DataIntegrityCheckFailed))
+            Ok((file_id, CheckResult::DataIntegrityCheckFailed))
         } 
     }
 

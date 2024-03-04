@@ -24,7 +24,7 @@ use crate::{
     types::*,
 };
 
-fn to_md5(input: &str) -> [u8; 32] {
+fn to_hash(input: &str) -> [u8; 32] {
     let mut array = [0; 32]; // Initialize with zeros
     let bytes = input.as_bytes();
     array[..bytes.len().min(32)].copy_from_slice(&bytes[..32.min(bytes.len())]);
@@ -63,24 +63,24 @@ fn file_is_correctly_registered() {
         let file_id = 1;
         create_agreement();
 
-        let md5 = to_md5("73f23a2793ce94355d83c1da8555c3de");
+        let hash = to_hash("73f23a2793ce94355d83c1da8555c3de");
 
         assert_ok!(DeitosFs::register_file(
             RuntimeOrigin::signed(CONSUMER),
             agreement_id,
-            md5
+            hash
         ));
 
         // Verify that the agreement status is correctly updated
         let file = Files::<Test>::get(agreement_id, file_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Pending);
-        assert_eq!(file.md5, md5);
+        assert_eq!(file.hash, hash);
 
         // Check for the correct event emission
         System::assert_has_event(RuntimeEvent::DeitosFs(Event::FileRegistered {
             agreement_id,
             file_id,
-            md5,
+            hash,
         }));
     });
 }
