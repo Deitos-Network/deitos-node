@@ -373,6 +373,8 @@ pub mod pallet {
         /// E.g., the consumer cannot prepay any more installments, or the IP cannot terminate the agreement
         /// due to non-payment, because all installments have been paid.
         NoUnpaidInstallments,
+        /// Agreement not found for consumer
+        NoAgreementForConsumer,
     }
 
     #[pallet::call]

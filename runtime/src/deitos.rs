@@ -41,6 +41,8 @@ impl pallet_deitos::Config for Runtime {
 
 parameter_types! {
     pub const DeitosFsPalletId: PalletId = PalletId(*b"DeitosFs");
+    pub const Seed: u32 = 12345;
+    pub const ErrorBoundary: u32 = 200;
 }
 
 impl pallet_deitos_fs::Config for Runtime {
@@ -50,4 +52,6 @@ impl pallet_deitos_fs::Config for Runtime {
     type FileId = FileId;
     type PalletId = DeitosFsPalletId;
     type Randomness = pallet_babe::ParentBlockRandomness<Runtime>;
+    type Seed = Seed;
+    type ErrorBoundary = ErrorBoundary;
 }

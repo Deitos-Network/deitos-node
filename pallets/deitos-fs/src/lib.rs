@@ -122,6 +122,12 @@ pub mod pallet {
         /// Pallet ID
         #[pallet::constant]
         type PalletId: Get<PalletId>;
+
+        #[pallet::constant]
+        type Seed: Get<u32>;
+
+        #[pallet::constant]
+        type ErrorBoundary: Get<u32>;
     }
 
     #[pallet::storage]
@@ -198,7 +204,8 @@ pub mod pallet {
                 let _ = Self::unsigned_file_upload(file_id, file, hadoop_file_hash).map_err(|_| <Error<T>>::FileFetchFailed);
             }
 
- 			if Self::is_current_block_eligible(block_number.saturated_into(), 12345) {
+            let seed: u32 = T::Seed::get();
+ 			if Self::is_current_block_eligible(block_number.saturated_into(), seed) {
                 let current_file_id = CurrentFileId::<T>::get();
                 if current_file_id.is_zero() {
                     return;
@@ -245,9 +252,7 @@ pub mod pallet {
             hash: FileHash,
             file_name: FileName,
         ) -> DispatchResult {
-            let _consumer = ensure_signed(origin)?;
-
-
+            let consumer = ensure_signed(origin)?;
             pallet_deitos::Pallet::<T>::consumer_has_agreement(&consumer,&agreement_id)?;
 
             let file_id: T::FileId = Self::next_file_id();
@@ -269,7 +274,7 @@ pub mod pallet {
         /// It checks the hash returned from the offchain worker and updates the file status if it matches.
         /// In case not, it increases the error count.
         #[pallet::call_index(1)]
-        #[pallet::weight(<T as Config>::WeightInfo::register_file())]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_file_validation())]
         pub fn submit_file_validation(
             origin: OriginFor<T>,
             file_id: T::FileId,
@@ -287,9 +292,10 @@ pub mod pallet {
             } else {
                 FilesToBeChecked::<T>::mutate(file_id, |file_option| {
                     if let Some(file_check) = file_option {
+                        let error_boundary: u32 = T::ErrorBoundary::get();
                         file_check.error_count = file_check.error_count.saturating_add(1);
 
-                        if file_check.error_count > 3 {
+                        if file_check.error_count > error_boundary {
                             file_check.status = FileValidationStatus::Conflict;
                             Self::deposit_event(Event::FileConflict { file_id });
                         } else {
@@ -305,7 +311,7 @@ pub mod pallet {
         }
 
 		#[pallet::call_index(2)]
-        #[pallet::weight(<T as Config>::WeightInfo::register_file())]
+        #[pallet::weight(<T as Config>::WeightInfo::data_integrity_protocol())]
         pub fn data_integrity_protocol(
             origin: OriginFor<T>,
             file_id: T::FileId, 

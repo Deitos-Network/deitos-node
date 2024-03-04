@@ -51,6 +51,9 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet_template.
 pub trait WeightInfo {
 	fn register_file() -> Weight;
+	fn submit_file_validation() -> Weight;
+	fn data_integrity_protocol() -> Weight;
+
 
 }
 
@@ -68,6 +71,28 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 
+	/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn submit_file_validation() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
+	/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn data_integrity_protocol() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+
 }
 
 // For backwards compatibility and tests
@@ -75,6 +100,28 @@ impl WeightInfo for () {
 	/// Storage: Deitos Something (r:0 w:1)
 	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
 	fn register_file() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn submit_file_validation() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+
+		/// Storage: Deitos Something (r:0 w:1)
+	/// Proof: Deitos Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
+	fn data_integrity_protocol() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

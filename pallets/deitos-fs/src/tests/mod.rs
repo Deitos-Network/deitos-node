@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
+use super::*;
 use frame_support::{
     assert_ok,
     pallet_prelude::*,
@@ -28,8 +29,10 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
+use sp_runtime::generic::UncheckedExtrinsic;
 
 use crate as pallet_deitos_fs;
+pub use pallet_insecure_randomness_collective_flip;
 
 mod fs;
 
@@ -42,9 +45,21 @@ frame_support::construct_runtime!(
         System: frame_system,
         Balances: pallet_balances,
         Deitos: pallet_deitos,
-        DeitosFs: pallet_deitos_fs
+        DeitosFs: pallet_deitos_fs,
+        RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
     }
 );
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
+where
+	RuntimeCall: From<C>,
+{
+	type Extrinsic = UncheckedExtrinsic;
+	type OverarchingCall = RuntimeCall;
+}
+
+
+impl pallet_insecure_randomness_collective_flip::Config for Test {}
 
 parameter_types! {
     pub const DeitosPalletId: PalletId = PalletId(*b"DeitosId");
@@ -117,12 +132,18 @@ impl pallet_deitos::Config for Test {
     type PalletId = DeitosPalletId;
 }
 
+parameter_types! {
+    pub const Seed: u32 = 12345;
+}
+
 impl pallet_deitos_fs::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
     type Currency = Balances;
     type FileId = FileId;
     type PalletId = DeitosPalletId;
+    type Randomness = RandomnessCollectiveFlip;
+    type Seed = Seed;
 }
 
 // Build genesis storage according to the mock runtime.

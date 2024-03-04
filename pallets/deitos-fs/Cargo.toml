@@ -30,6 +30,8 @@ pallet-deitos =  { workspace = true }
 pallet-balances = { workspace = true, default-features = true }
 sp-keystore = { workspace = true }
 sp-core = { workspace = true, default-features = true }
+pallet-babe = { workspace = true, default-features = true }
+pallet-insecure-randomness-collective-flip = { workspace = true, default-features = true }
 
 [features]
 default = ["std"]
@@ -45,7 +47,9 @@ std = [
     "sp-runtime/std",
     "sp-std/std",
     "pallet-deitos/std",
-    "rand_chacha/std"
+    "pallet-babe/std",
+    "rand_chacha/std",
+    "pallet-insecure-randomness-collective-flip/std"
 ]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",

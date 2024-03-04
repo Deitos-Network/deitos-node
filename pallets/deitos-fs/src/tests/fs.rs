@@ -15,19 +15,19 @@
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::*;
-use frame_support::traits::fungible;
 use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_deitos::StorageSizeMB;
 
 use crate::{
-    pallet::{CurrentFileId, Event, Files},
+    pallet::{Event, Files},
     types::*,
 };
 
-fn to_hash(input: &str) -> [u8; 32] {
-    let mut array = [0; 32]; // Initialize with zeros
+
+fn to_hash(input: &str) -> [u8; 64] {
+    let mut array = [0; 64]; // Initialize with zeros
     let bytes = input.as_bytes();
-    array[..bytes.len().min(32)].copy_from_slice(&bytes[..32.min(bytes.len())]);
+    array[..bytes.len().min(32)].copy_from_slice(&bytes[..64.min(bytes.len())]);
     array
 }
 
@@ -63,16 +63,18 @@ fn file_is_correctly_registered() {
         let file_id = 1;
         create_agreement();
 
-        let hash = to_hash("73f23a2793ce94355d83c1da8555c3de");
+        let hash= to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c0");
+        let file_name = b"file.txt".to_vec();
 
         assert_ok!(DeitosFs::register_file(
             RuntimeOrigin::signed(CONSUMER),
             agreement_id,
-            hash
+            hash,
+            file_name.into()
         ));
 
         // Verify that the agreement status is correctly updated
-        let file = Files::<Test>::get(agreement_id, file_id).unwrap();
+        let file = Files::<Test>::get(agreement_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Pending);
         assert_eq!(file.hash, hash);
 
