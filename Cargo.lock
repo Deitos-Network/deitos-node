@@ -1709,7 +1709,7 @@ dependencies = [
 
 [[package]]
 name = "deitos-node"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "clap",
  "deitos-runtime",
@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "deitos-runtime"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "frame-benchmarking",
  "frame-executive",
@@ -4917,7 +4917,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-deitos"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -4935,7 +4935,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-deitos-fs"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
