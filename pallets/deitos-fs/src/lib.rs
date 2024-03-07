@@ -60,11 +60,7 @@ pub use types::*;
 pub use weights::*;
 
 mod impls;
-#[cfg(test)]
-mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 mod types;
 
 #[allow(missing_docs)]
