@@ -41,6 +41,23 @@ impl<T: Config> Pallet<T> {
         })
     }
 
+    /// Checks if the consumer has the specified agreement.
+    /// Returns Ok if the agreement is found, Err otherwise.
+    pub fn consumer_has_agreement(
+        consumer: &T::AccountId,
+        agreement_id: &T::AgreementId,
+    ) -> DispatchResult {
+        let agreements = ConsumerAgreements::<T>::get(consumer);
+        // Check if the agreement ID exists in the consumer's agreements.
+        if agreements.contains(agreement_id) {
+            // Agreement found, operation successful.
+            Ok(())
+        } else {
+            // Agreement not found, return an error.
+            Err(Error::<T>::NoAgreementForConsumer.into())
+        }
+    }
+
     /// Inserts a new agreement into the proper storages and returns the agreement id.
     #[transactional]
     pub fn insert_agreement(
