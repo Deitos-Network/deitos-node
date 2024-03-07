@@ -92,7 +92,5 @@ pub enum CheckResult {
     /// File upload validation
     CheckPassed,
     /// Data integrity check
-    DataIntegrityCheckFailed
+    DataIntegrityCheckFailed,
 }
-
-

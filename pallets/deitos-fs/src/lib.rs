@@ -24,14 +24,9 @@ use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
     traits::{
-        tokens::{
-            fungible::{
-                hold::{
-                    Balanced as BalancedHold,
-                    Unbalanced as FunHoldUnbalanced,
-                },
-                Inspect as FunInspect, Mutate as FunMutate,
-            }
+        tokens::fungible::{
+            hold::{Balanced as BalancedHold, Unbalanced as FunHoldUnbalanced},
+            Inspect as FunInspect, Mutate as FunMutate,
         },
         ConstU32, Get,
     },
@@ -43,7 +38,7 @@ pub use sp_runtime::{
     offchain::{
         http,
         storage::{MutateStorageError, StorageRetrievalError, StorageValueRef},
-        Duration, Timestamp
+        Duration, Timestamp,
     },
     traits::{One, Saturating, StaticLookup, TrailingZeroInput, Zero},
     transaction_validity::{InvalidTransaction, TransactionValidity, ValidTransaction},
@@ -51,14 +46,13 @@ pub use sp_runtime::{
 };
 
 use frame_support::traits::Randomness;
-use frame_system::offchain::{SubmitTransaction, SendTransactionTypes};
+use frame_system::offchain::{SendTransactionTypes, SubmitTransaction};
 use rand_chacha::{
     rand_core::{RngCore, SeedableRng},
     ChaChaRng,
 };
 use scale_info::prelude::format;
 use sp_std::{convert::TryInto, prelude::*};
-
 
 #[warn(unused_imports)]
 pub use pallet::*;
@@ -87,7 +81,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-		SendTransactionTypes<Call<Self>> + frame_system::Config + pallet_deitos::Config
+        SendTransactionTypes<Call<Self>> + frame_system::Config + pallet_deitos::Config
     {
         /// The overarching runtime event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -187,30 +181,30 @@ pub mod pallet {
         CheckDataInternalFailure,
         /// File fetched Failed
         FileFetchFailed,
-
     }
 
     /// Hook
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
-           
             for (file_id, file) in FilesToBeChecked::<T>::iter() {
                 let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
                 let hadoop_file_hash = Self::fetch_file_hash(&name).unwrap();
 
-                let _ = Self::unsigned_file_upload(file_id, file, hadoop_file_hash).map_err(|_| <Error<T>>::FileFetchFailed);
+                let _ = Self::unsigned_file_upload(file_id, file, hadoop_file_hash)
+                    .map_err(|_| <Error<T>>::FileFetchFailed);
             }
 
             let seed: u32 = T::Seed::get();
- 			if Self::is_current_block_eligible(block_number.saturated_into(), seed) {
+            if Self::is_current_block_eligible(block_number.saturated_into(), seed) {
                 let current_file_id = CurrentFileId::<T>::get();
                 if current_file_id.is_zero() {
                     return;
                 }
                 let (file_id, result) = Self::check_data_integrity_protocol().unwrap();
-                let _ = Self::unsigned_check_integrity(file_id,result).map_err(|_| <Error<T>>::FileFetchFailed);
-			}
+                let _ = Self::unsigned_check_integrity(file_id, result)
+                    .map_err(|_| <Error<T>>::FileFetchFailed);
+            }
         }
     }
 
@@ -233,7 +227,10 @@ pub mod pallet {
                     file: _file,
                     returned_hash: _returned_hash,
                 } => valid_tx(b"submit_file_validation".to_vec()),
-				Call::data_integrity_protocol {file_id: _file_id, result: _result} => valid_tx(b"data_integrity_protocol".to_vec()),
+                Call::data_integrity_protocol {
+                    file_id: _file_id,
+                    result: _result,
+                } => valid_tx(b"data_integrity_protocol".to_vec()),
                 _ => InvalidTransaction::Call.into(),
             }
         }
@@ -251,7 +248,7 @@ pub mod pallet {
             file_name: FileName,
         ) -> DispatchResult {
             let consumer = ensure_signed(origin)?;
-            pallet_deitos::Pallet::<T>::consumer_has_agreement(&consumer,&agreement_id)?;
+            pallet_deitos::Pallet::<T>::consumer_has_agreement(&consumer, &agreement_id)?;
 
             let file_id: T::FileId = Self::next_file_id();
 
@@ -308,18 +305,18 @@ pub mod pallet {
             Ok(())
         }
 
-		#[pallet::call_index(2)]
+        #[pallet::call_index(2)]
         #[pallet::weight(<T as Config>::WeightInfo::data_integrity_protocol())]
         pub fn data_integrity_protocol(
             origin: OriginFor<T>,
-            file_id: T::FileId, 
-            result: CheckResult
+            file_id: T::FileId,
+            result: CheckResult,
         ) -> DispatchResult {
             ensure_none(origin)?;
             match result {
                 CheckResult::CheckPassed => {
                     Self::deposit_event(Event::DataIntegrityCheckSuccessful { file_id });
-                },
+                }
                 CheckResult::DataIntegrityCheckFailed => {
                     Self::deposit_event(Event::DataIntegrityCheckFailed { file_id });
                 }
@@ -362,29 +359,28 @@ impl<T: Config> Pallet<T> {
         file: FileDetails<T>,
         returned_hash: FileHash,
     ) -> Result<(), Error<T>> {
+        let call = Call::submit_file_validation {
+            file_id,
+            file,
+            returned_hash,
+        };
 
-		let call = Call::submit_file_validation {
-			file_id,
-			file,
-			returned_hash,
-		};
+        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
+            log::error!("Failed in offchain_unsigned_tx");
+            <Error<T>>::OffchainUnsignedTxError
+        })
+    }
 
-		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
-			log::error!("Failed in offchain_unsigned_tx");
-			<Error<T>>::OffchainUnsignedTxError
-		})
-	}
+    fn unsigned_check_integrity(file_id: T::FileId, result: CheckResult) -> Result<(), Error<T>> {
+        let call = Call::data_integrity_protocol { file_id, result };
 
-	fn unsigned_check_integrity(file_id: T::FileId,result: CheckResult) -> Result<(), Error<T>> {
-		let call = Call::data_integrity_protocol {file_id,result};
+        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
+            log::error!("Failed in offchain_unsigned_tx");
+            <Error<T>>::OffchainUnsignedTxError
+        })
+    }
 
-		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
-			log::error!("Failed in offchain_unsigned_tx");
-			<Error<T>>::OffchainUnsignedTxError
-		})
-	}
-
-    fn check_data_integrity_protocol() -> Result<(T::FileId,  CheckResult), Error<T>> { 
+    fn check_data_integrity_protocol() -> Result<(T::FileId, CheckResult), Error<T>> {
         let last_file_id = CurrentFileId::<T>::get();
         log::info!("DI last_file_id {:?}", last_file_id);
         let last_file_id: u32 = last_file_id.saturated_into();
@@ -393,27 +389,30 @@ impl<T: Config> Pallet<T> {
         let (seed, _block) = T::Randomness::random(phrase);
         let seed_as_bytes = seed.encode(); // This gives you a Vec<u8>
         let seed_slice = seed_as_bytes.as_slice(); // Convert Vec<u8> to &[u8]
-        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed_slice)).map_err(|_| <Error<T>>::CheckDataInternalFailure)?;
+        let seed = <[u8; 32]>::decode(&mut TrailingZeroInput::new(seed_slice))
+            .map_err(|_| <Error<T>>::CheckDataInternalFailure)?;
 
         let mut rng = ChaChaRng::from_seed(seed);
         let random_value = rng.next_u32();
         let file_id: T::FileId = (1 + (random_value % last_file_id)).into();
-        let file: FileDetails<T> = Files::<T>::get(file_id).ok_or(Error::<T>::CheckDataInternalFailure)?;
-        let name = sp_std::str::from_utf8(file.file_name.as_slice()).map_err(|_| <Error<T>>::CheckDataInternalFailure)?;
-        let hadoop_file_hash = Self::fetch_file_hash(name).map_err(|_| <Error<T>>::FileFetchFailed)?;
+        let file: FileDetails<T> =
+            Files::<T>::get(file_id).ok_or(Error::<T>::CheckDataInternalFailure)?;
+        let name = sp_std::str::from_utf8(file.file_name.as_slice())
+            .map_err(|_| <Error<T>>::CheckDataInternalFailure)?;
+        let hadoop_file_hash =
+            Self::fetch_file_hash(name).map_err(|_| <Error<T>>::FileFetchFailed)?;
         if file.hash == hadoop_file_hash {
             Ok((file_id, CheckResult::CheckPassed))
         } else {
             Ok((file_id, CheckResult::DataIntegrityCheckFailed))
-        } 
+        }
     }
 
-	fn is_current_block_eligible(current_block_number: u32, seed: u32) -> bool {
-		let range_size = 10;
-		let range_index = (current_block_number - 1) / range_size;
-		let offset = (seed.wrapping_add(range_index as u32) ^ seed) % range_size;
-		let eligible_block_number = range_index * range_size + offset + 1;
-		current_block_number == eligible_block_number
-	}
-	
+    fn is_current_block_eligible(current_block_number: u32, seed: u32) -> bool {
+        let range_size = 10;
+        let range_index = (current_block_number - 1) / range_size;
+        let offset = (seed.wrapping_add(range_index as u32) ^ seed) % range_size;
+        let eligible_block_number = range_index * range_size + offset + 1;
+        current_block_number == eligible_block_number
+    }
 }

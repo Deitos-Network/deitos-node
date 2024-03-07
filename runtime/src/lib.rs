@@ -313,13 +313,12 @@ construct_runtime!(
     }
 );
 
-
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 where
-	RuntimeCall: From<C>,
+    RuntimeCall: From<C>,
 {
-	type Extrinsic = UncheckedExtrinsic;
-	type OverarchingCall = RuntimeCall;
+    type Extrinsic = UncheckedExtrinsic;
+    type OverarchingCall = RuntimeCall;
 }
 
 /// The address format for describing accounts.

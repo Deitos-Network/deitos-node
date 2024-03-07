@@ -25,11 +25,11 @@ use frame_support::{
 use pallet_deitos::{CurrentAgreementId, IPStatus, PaymentPlan, StorageSizeMB};
 use sp_core::H256;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+use sp_runtime::generic::UncheckedExtrinsic;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
-use sp_runtime::generic::UncheckedExtrinsic;
 
 use crate as pallet_deitos_fs;
 pub use pallet_insecure_randomness_collective_flip;
@@ -52,12 +52,11 @@ frame_support::construct_runtime!(
 
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
 where
-	RuntimeCall: From<C>,
+    RuntimeCall: From<C>,
 {
-	type Extrinsic = UncheckedExtrinsic;
-	type OverarchingCall = RuntimeCall;
+    type Extrinsic = UncheckedExtrinsic;
+    type OverarchingCall = RuntimeCall;
 }
-
 
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
 
