@@ -329,8 +329,7 @@ pub mod pallet {
 impl<T: Config> Pallet<T> {
     fn fetch_file_hash(file_id: &str) -> Result<FileHash, http::Error> {
         let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
-        // TODO: Replace this with the actual URL
-        let url = format!("http://localhost:3030/{}", file_id);
+        let url = format!("http://verifier.deitos.network:4040/{}", file_id);
         let request = http::Request::get(&url);
         let pending = request
             .deadline(deadline)
