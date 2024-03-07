@@ -49,7 +49,7 @@ impl<T: Config> Pallet<T> {
     ) -> DispatchResult {
         let agreements = ConsumerAgreements::<T>::get(consumer);
         // Check if the agreement ID exists in the consumer's agreements.
-        if agreements.iter().any(|x| x == agreement_id) {
+        if agreements.contains(agreement_id) {
             // Agreement found, operation successful.
             Ok(())
         } else {

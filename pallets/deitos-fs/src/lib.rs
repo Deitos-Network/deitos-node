@@ -255,7 +255,6 @@ pub mod pallet {
             let file = FileDetails::<T>::new(agreement_id, hash, file_name);
 
             FilesToBeChecked::<T>::insert(file_id, file);
-            CurrentFileId::<T>::put(file_id);
 
             Self::deposit_event(Event::FileRegistered {
                 agreement_id,
