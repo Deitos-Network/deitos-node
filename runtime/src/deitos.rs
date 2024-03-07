@@ -15,10 +15,6 @@
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::*;
-use frame_support::PalletId;
-/// Import the deitos pallet.
-pub use pallet_deitos;
-pub use pallet_deitos_fs;
 
 pub type AgreementId = u32;
 pub type FileId = u32;

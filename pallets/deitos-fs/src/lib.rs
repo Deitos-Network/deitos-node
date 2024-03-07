@@ -185,7 +185,7 @@ pub mod pallet {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             for (file_id, file) in FilesToBeChecked::<T>::iter() {
                 let name = sp_std::str::from_utf8(file.file_name.as_slice()).unwrap();
-                let hadoop_file_hash = Self::fetch_file_hash(&name).unwrap();
+                let hadoop_file_hash = Self::fetch_file_hash(name).unwrap();
 
                 let _ = Self::unsigned_file_upload(file_id, file, hadoop_file_hash)
                     .map_err(|_| <Error<T>>::FileFetchFailed);
@@ -405,7 +405,7 @@ impl<T: Config> Pallet<T> {
     fn is_current_block_eligible(current_block_number: u32, seed: u32) -> bool {
         let range_size = 10;
         let range_index = (current_block_number - 1) / range_size;
-        let offset = (seed.wrapping_add(range_index as u32) ^ seed) % range_size;
+        let offset = (seed.wrapping_add(range_index) ^ seed) % range_size;
         let eligible_block_number = range_index * range_size + offset + 1;
         current_block_number == eligible_block_number
     }
