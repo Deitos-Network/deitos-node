@@ -34,6 +34,10 @@ use frame_support::{
 };
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 
+
+#[cfg(test)]
+mod tests;
+
 pub use sp_runtime::{
     offchain::{
         http,

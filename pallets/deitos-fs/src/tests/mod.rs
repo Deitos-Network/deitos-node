@@ -17,19 +17,17 @@
 use super::*;
 use frame_support::{
     assert_ok,
-    pallet_prelude::*,
     parameter_types,
     traits::{ConstU32, ConstU64},
     PalletId,
 };
-use pallet_deitos::{CurrentAgreementId, IPStatus, PaymentPlan, StorageSizeMB};
+use pallet_deitos::{IPStatus, PaymentPlan, StorageSizeMB};
 use sp_core::H256;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
-use sp_runtime::generic::UncheckedExtrinsic;
 
 use crate as pallet_deitos_fs;
 
@@ -47,6 +45,7 @@ frame_support::construct_runtime!(
         Deitos: pallet_deitos,
         DeitosFs: pallet_deitos_fs,
         Babe: pallet_babe,
+		Timestamp: pallet_timestamp,
     }
 );
 
@@ -103,10 +102,18 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub const EpochDuration: u64 = 10;
-	pub const ExpectedBlockTime: Moment = 6_000;
+	pub const ExpectedBlockTime: u64 = 6_000;
 	pub const ReportLongevity: u64 = 10;
 	pub const MaxAuthorities: u32 = 100_000;
 }
+
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = Babe;
+	type MinimumPeriod = ConstU64<1>;
+	type WeightInfo = ();
+}
+
 
 impl pallet_babe::Config for Test {
 	type EpochDuration = EpochDuration;
@@ -199,16 +206,6 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     ext
 }
 
-pub fn run_to_block(n: u64) {
-    while System::block_number() < n {
-        if System::block_number() > 1 {
-            System::on_finalize(System::block_number());
-        }
-        System::set_block_number(System::block_number() + 1);
-        System::on_initialize(System::block_number());
-    }
-}
-
 pub fn register_ip(ip: AccountId, total_storage: StorageSizeMB) {
     assert_ok!(Deitos::ip_register(
         RuntimeOrigin::signed(ip),
@@ -226,26 +223,4 @@ fn register_and_activate_ip(ip: AccountId, total_storage: StorageSizeMB) {
     ));
 }
 
-fn create_accepted_agreement(
-    ip: AccountId,
-    consumer: AccountId,
-    storage: StorageSizeMB,
-    activation_block: u64,
-    payment_plan: PaymentPlan<Test>,
-) -> AgreementId {
-    assert_ok!(Deitos::consumer_request_agreement(
-        RuntimeOrigin::signed(consumer),
-        ip,
-        storage,
-        activation_block,
-        payment_plan,
-    ));
 
-    let agreement_id = CurrentAgreementId::<Test>::get();
-    assert_ok!(Deitos::ip_accept_agreement(
-        RuntimeOrigin::signed(ip),
-        agreement_id,
-    ));
-
-    agreement_id
-}

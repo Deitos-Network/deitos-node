@@ -27,7 +27,7 @@ use crate::{
 fn to_hash(input: &str) -> [u8; 64] {
     let mut array = [0; 64]; // Initialize with zeros
     let bytes = input.as_bytes();
-    array[..bytes.len().min(32)].copy_from_slice(&bytes[..64.min(bytes.len())]);
+    array[..bytes.len().min(64)].copy_from_slice(&bytes[..64.min(bytes.len())]);
     array
 }
 
@@ -69,12 +69,12 @@ fn file_is_correctly_registered() {
         assert_ok!(DeitosFs::register_file(
             RuntimeOrigin::signed(CONSUMER),
             agreement_id,
-            hash,
-            file_name.into()
+            hash.into(),
+            FileName::try_from(file_name).unwrap()
         ));
 
         // Verify that the agreement status is correctly updated
-        let file = Files::<Test>::get(agreement_id).unwrap();
+        let file = FilesToBeChecked::<Test>::get(file_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Pending);
         assert_eq!(file.hash, hash);
 
@@ -84,5 +84,79 @@ fn file_is_correctly_registered() {
             file_id,
             hash,
         }));
+    });
+}
+
+#[test]
+fn file_is_correctly_verified() {
+    new_test_ext().execute_with(|| {
+        let agreement_id = 1;
+        let file_id = 1;
+        create_agreement();
+
+        let hash= to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c0");
+        let file_name = b"file.txt".to_vec();
+
+        assert_ok!(DeitosFs::register_file(
+            RuntimeOrigin::signed(CONSUMER),
+            agreement_id,
+            hash.into(),
+            FileName::try_from(file_name).unwrap()
+        ));
+
+        // Verify that the agreement status is correctly updated
+        let file = FilesToBeChecked::<Test>::get(file_id).unwrap();
+
+        assert_ok!(DeitosFs::submit_file_validation(
+            RuntimeOrigin::none(),
+            file_id,
+            file,
+            hash
+        ));
+
+        // Verify that the agreement status is correctly updated
+        let file = Files::<Test>::get(file_id).unwrap();
+        assert_eq!(file.status, FileValidationStatus::Verified);
+        assert_eq!(file.hash, hash);
+
+
+    });
+}
+
+#[test]
+fn file_is_not_verified() {
+    new_test_ext().execute_with(|| {
+        let agreement_id = 1;
+        let file_id = 1;
+        create_agreement();
+
+        let hash= to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c3");
+        let returned_hash= to_hash("XXXb3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c3");
+
+        let file_name = b"file.txt".to_vec();
+
+        assert_ok!(DeitosFs::register_file(
+            RuntimeOrigin::signed(CONSUMER),
+            agreement_id,
+            hash.into(),
+            FileName::try_from(file_name).unwrap()
+        ));
+
+        // Verify that the agreement status is correctly updated
+        let file = FilesToBeChecked::<Test>::get(file_id).unwrap();
+
+        assert_ok!(DeitosFs::submit_file_validation(
+            RuntimeOrigin::none(),
+            file_id,
+            file,
+            returned_hash
+        ));
+
+        // Verify that the agreement status is correctly updated
+        let file = FilesToBeChecked::<Test>::get(file_id).unwrap();
+        assert_eq!(file.status, FileValidationStatus::Pending);
+        assert_eq!(file.error_count, 1);
+
+
     });
 }
