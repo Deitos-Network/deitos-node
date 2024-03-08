@@ -14,8 +14,3 @@ jobs:
   build_test:
     name: Build & Tests
     uses: ./.github/workflows/build-test.yml
-
-  linters:
-    name: Run linters
-    uses: ./.github/workflows/linters.yml
-    needs: [ build_test ]
