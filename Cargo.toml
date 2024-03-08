@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Deitos"]
 edition = "2021"
 repository = "https://github.com/Deitos-Network/deitos-node.git"
