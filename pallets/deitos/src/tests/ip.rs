@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Deitos Node.  If not, see <http://www.gnu.org/licenses/>.
 
-use frame_support::{assert_noop, traits::fungible, BoundedVec};
+use frame_support::{assert_noop, traits::fungible};
 use frame_system::pallet_prelude::BlockNumberFor;
 
 use crate::{
