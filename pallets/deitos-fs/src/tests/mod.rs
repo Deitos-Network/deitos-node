@@ -16,7 +16,8 @@
 
 use super::*;
 use frame_support::{
-    assert_ok, parameter_types,
+    assert_ok,
+    parameter_types,
     traits::{ConstU32, ConstU64},
     PalletId,
 };
@@ -44,17 +45,18 @@ frame_support::construct_runtime!(
         Deitos: pallet_deitos,
         DeitosFs: pallet_deitos_fs,
         Babe: pallet_babe,
-        Timestamp: pallet_timestamp,
+		Timestamp: pallet_timestamp,
     }
 );
 
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
 where
-    RuntimeCall: From<C>,
+	RuntimeCall: From<C>,
 {
-    type Extrinsic = UncheckedExtrinsic;
-    type OverarchingCall = RuntimeCall;
+	type Extrinsic = UncheckedExtrinsic;
+	type OverarchingCall = RuntimeCall;
 }
+
 
 parameter_types! {
     pub const DeitosPalletId: PalletId = PalletId(*b"DeitosId");
@@ -99,31 +101,32 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-    pub const EpochDuration: u64 = 10;
-    pub const ExpectedBlockTime: u64 = 6_000;
-    pub const ReportLongevity: u64 = 10;
-    pub const MaxAuthorities: u32 = 100_000;
+	pub const EpochDuration: u64 = 10;
+	pub const ExpectedBlockTime: u64 = 6_000;
+	pub const ReportLongevity: u64 = 10;
+	pub const MaxAuthorities: u32 = 100_000;
 }
 
 impl pallet_timestamp::Config for Test {
-    type Moment = u64;
-    type OnTimestampSet = Babe;
-    type MinimumPeriod = ConstU64<1>;
-    type WeightInfo = ();
+	type Moment = u64;
+	type OnTimestampSet = Babe;
+	type MinimumPeriod = ConstU64<1>;
+	type WeightInfo = ();
 }
 
-impl pallet_babe::Config for Test {
-    type EpochDuration = EpochDuration;
-    type ExpectedBlockTime = ExpectedBlockTime;
 
-    // session module is the trigger
-    type EpochChangeTrigger = pallet_babe::ExternalTrigger;
-    type DisabledValidators = ();
-    type WeightInfo = ();
-    type MaxAuthorities = MaxAuthorities;
-    type MaxNominators = ConstU32<0>;
-    type KeyOwnerProof = sp_core::Void;
-    type EquivocationReportSystem = ();
+impl pallet_babe::Config for Test {
+	type EpochDuration = EpochDuration;
+	type ExpectedBlockTime = ExpectedBlockTime;
+
+	// session module is the trigger
+	type EpochChangeTrigger = pallet_babe::ExternalTrigger;
+	type DisabledValidators = ();
+	type WeightInfo = ();
+	type MaxAuthorities = MaxAuthorities;
+	type MaxNominators = ConstU32<0>;
+	type KeyOwnerProof = sp_core::Void;
+	type EquivocationReportSystem = ();
 }
 
 impl pallet_balances::Config for Test {
@@ -169,7 +172,7 @@ impl pallet_deitos_fs::Config for Test {
     type PalletId = DeitosPalletId;
     type Randomness = pallet_babe::ParentBlockRandomness<Test>;
     type Seed = Seed;
-    type ErrorBoundary = ErrorBoundary;
+    type ErrorBoundary = ErrorBoundary ;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -219,3 +222,5 @@ fn register_and_activate_ip(ip: AccountId, total_storage: StorageSizeMB) {
         IPStatus::Active
     ));
 }
+
+

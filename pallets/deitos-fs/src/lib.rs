@@ -34,6 +34,7 @@ use frame_support::{
 };
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 
+
 #[cfg(test)]
 mod tests;
 
@@ -291,11 +292,10 @@ pub mod pallet {
                         if file_check.error_count > error_boundary {
                             file_check.status = FileValidationStatus::Conflict;
                             Self::deposit_event(Event::FileConflict { file_id });
-                        }
-                        if file_check.error_count > 10 {
+                        } else {
                             Self::deposit_event(Event::FileNotVerified {
                                 file_id,
-                                error_count: file_check.error_count - 10,
+                                error_count: file_check.error_count,
                             });
                         }
                     }
