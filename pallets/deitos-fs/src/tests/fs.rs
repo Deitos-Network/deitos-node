@@ -23,7 +23,6 @@ use crate::{
     types::*,
 };
 
-
 fn to_hash(input: &str) -> [u8; 64] {
     let mut array = [0; 64]; // Initialize with zeros
     let bytes = input.as_bytes();
@@ -63,7 +62,7 @@ fn file_is_correctly_registered() {
         let file_id = 1;
         create_agreement();
 
-        let hash= to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c0");
+        let hash = to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c0");
         let file_name = b"file.txt".to_vec();
 
         assert_ok!(DeitosFs::register_file(
@@ -94,7 +93,7 @@ fn file_is_correctly_verified() {
         let file_id = 1;
         create_agreement();
 
-        let hash= to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c0");
+        let hash = to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c0");
         let file_name = b"file.txt".to_vec();
 
         assert_ok!(DeitosFs::register_file(
@@ -118,8 +117,6 @@ fn file_is_correctly_verified() {
         let file = Files::<Test>::get(file_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Verified);
         assert_eq!(file.hash, hash);
-
-
     });
 }
 
@@ -130,8 +127,9 @@ fn file_is_not_verified() {
         let file_id = 1;
         create_agreement();
 
-        let hash= to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c3");
-        let returned_hash= to_hash("XXXb3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c3");
+        let hash = to_hash("c43b3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c3");
+        let returned_hash =
+            to_hash("XXXb3a108132702db1a3593550ef836081e781755dc32956c87c5be92e15d7c3");
 
         let file_name = b"file.txt".to_vec();
 
@@ -156,7 +154,5 @@ fn file_is_not_verified() {
         let file = FilesToBeChecked::<Test>::get(file_id).unwrap();
         assert_eq!(file.status, FileValidationStatus::Pending);
         assert_eq!(file.error_count, 1);
-
-
     });
 }
