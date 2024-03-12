@@ -278,7 +278,7 @@ pub mod pallet {
             let mut new_file = file.clone();
             if file.hash == returned_hash && file.status == FileValidationStatus::Pending {
                 new_file.status = FileValidationStatus::Verified;
-
+                new_file.error_count = 0;
                 Files::<T>::insert(file_id, new_file);
                 FilesToBeChecked::<T>::remove(file_id);
                 Self::deposit_event(Event::FileVerified { file_id });
