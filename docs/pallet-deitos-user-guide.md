@@ -210,3 +210,133 @@ In this phase, the process involves deliberately not completing the consumer's p
 As a result of this termination due to non-payment, the consumer faces penalties. All reserved funds associated with this agreement are transferred to the IP, and the agreement is conclusively terminated.
 
 Following the termination and completion of all required actions, the agreement's related storage items are cleared from the system. This step ensures efficient management of system resources and data integrity.
+
+## 5 Upload files and Data integrity protocol
+
+Since we have interacted with every agreement's management option, now is time to focus on the file upload and data integrity protocol and let the Deitos protocol to validate if a consumer is granted or not to upload their files into the infrastructure provider.
+
+As what we want to demonstrate here is the upload functionality of the protocol  we are going to re use the same infrastructure provider BOB, but using a different consumer this time: ALICE
+
+For this we are going to create a simple agreement between ALICE (consumer) and BOB (IP) with only two very long installments  of 3000 blocks each, so we can focus on the file upload and verification:
+
+
+## 5.1 Set agreement.
+
+![userdoc.5.request.agreement](assets/userdoc.5.request.agreement.png)
+
+Once confirmed, the event will retrieve the agreement id, which it will be necessary for next steps:
+
+![userdoc.5.request.agreement.event](assets/userdoc.5.request.agreement.event.png)
+
+Note: in this example, we are using agreement id "1", most probably the user following all the documentation will have higher number ids.
+
+Similar as previous steps, the IP needs to approve the agreement:
+
+![userdoc.5.ip.accept.agreement](assets/userdoc.5.ip.accept.agreement.png)
+
+Finally, to make everything ready to upload files, the consumer should make an installment:
+
+![userdoc.5.consumer.prepayinstalment](assets/userdoc.5.consumer.prepayinstalment.png)
+
+Now, as we have everything ready so ALICE can start uploading files based on its agreement.
+
+## 5.2 Uploading files.
+
+Deitos development team has developed a CLI that allows the users to upload their files to the IP, based on all the agreements status.
+
+For this, the user can download the following binary:
+
+
+https://github.com/Deitos-Network/deitos-cli/releases/download/v0.0.1/deitos-cli
+
+So once the binary was downloaded the can start the upload. 
+
+First we create a test file:
+
+```
+ echo "this is my new super great file" > grant.txt
+```
+
+Then we invoke the CLI, with the followin command:
+
+```
+deitos-cli upload  --file-path=./examples/grant.txt --deitos-url=ws://localhost:9944 --ip-url=http://localhost:9090 --agreement=1 --suri=//Alice
+
+```
+
+As we can see, the file was correctly uploaded:
+
+```
+File hash: 4e9f6244c3edacc38d29792b9815803c64e4040106fad90771838f950968f072
+File registration submitted, waiting for transaction to be finalized...
+File registered successfully
+Token data: Header { algorithm: "Sr25519", type_: Some(JsonWebToken) }
+Claims { sub: "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY", aud: 1, exp: 1710354012001, iat: 1710267612001 }
+Uploading file to http://localhost:9090/v1/files with JWT eyJhbGciOiJTcjI1NTE5IiwidHlwIjoiSldUIn0.eyJzdWIiOiI1R3J3dmFFRjV6WGIyNkZ6OXJjUXBEV1M1N0N0RVJIcE5laFhDUGNOb0hHS3V0UVkiLCJhdWQiOjEsImV4cCI6MTcxMDM1NDAxMjAwMSwiaWF0IjoxNzEwMjY3NjEyMDAxfQ.UhZb15pqZxk5zws1-8DyHcDLFgMMv4maKtHRIVz45GpcO1pvbpOGIB7v3GEycHZWo_UwT4nrA8K1jYrcREYAiw
+File uploaded successfully
+```
+
+We will see an event confirming this:
+
+![userdoc.5.file.registered](assets/userdoc.5.file.registered.png)
+
+
+The CLI functioning is very interesting since many steps are involved within:
+
+1) encrypts the file to SHA256 
+2) In a JWT token, it wraps the signature of the consumer , in this case ALICE.
+3) The Proxy (a.k.a Deitos Gate), reads the incomming request and it verifies if the consumer has that active agreement with that provider (in this case BOB).
+4) If all conditions are met, it the proxy signs the message and invokes the extrinsic `deitosFS:registerFile`
+
+We could validate the functioning of the CLI trying to upload a file from the wrong consumer:
+
+First let's create another file:
+
+```
+echo "This file will never be uploaded" >  examples/file_to_fail.txt
+```
+
+Then trying to upload the file from another account like CHARLIE, we can see the Deitos Gate, refuses the request:
+
+```
+deitos-cli upload  --file-path=./examples/file_to_fail.txt --deitos-url=ws://localhost:9944 --ip-url=http://localhost:9090 --agreement=1 --suri=//Charlie
+File hash: c0b4f8ec665aef7d05e5838b87010b1fdf8f3995ce21f312380d6e2c6ceb5c8a
+File registration submitted, waiting for transaction to be finalized...
+thread 'main' panicked at src/chain.rs:68:14:
+File registration should finalize: Runtime(Module(ModuleError(<Deitos::NoAgreementForConsumer>)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+
+
+## 5.3  File upload verification
+
+Once the file was uploaded, all the verification inside the IP starts. The following verification process starts on the IP side:
+
+1) Query the recent uploaded file
+2) Through the [Deitos Verifier](https://github.com/Deitos-Network/deitos-verifier), a off chain worker pulls the file content of the file, it calculate the corresponding SHA256 hash and if it match with the file hash calculated by the CLI, then the file is verified.
+
+Once a file gets verified, the corresponding event will be triggered confirming this:
+
+
+![userdoc.5.file.verified](assets/userdoc.5.file.verified.png)
+
+Also, we could confirm the file was correctly uploaded by hitting the Hadoop file explorer:
+
+![userdoc.5.fileuploaded.hadoop](assets/userdoc.5.fileuploaded.hadoop.png)
+http://localhost:50070/explorer.html#/data/deitos
+
+Accesing the file, we can check the file content matches :
+
+![userdoc.5.fileuploaded.hadoop.content](assets/userdoc.5.fileuploaded.hadoop.content.png)
+
+## 5.4 Data integrity protocol
+
+Deitos Network checks the data integrity of the files uploaded. The principle is the same as the file upload verifier, by using the [Deitos Verifier](https://github.com/Deitos-Network/deitos-verifier) there is a off chain worker than during a random amount of blocks it picks randomnly a verified file and through the verifier, it assures that the hash registered in the blockchain matches with the file retrieved by the verifier.
+
+As in this point of the exercise, we only have one file uploaded the data integrity protocol will report a successful check for the file ID 1:
+
+![userdoc.5.file.check.verified](assets/userdoc.5.file.check.verified.png)
+
+
+
